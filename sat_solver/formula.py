@@ -10,8 +10,26 @@ class Literal(object):
         self.idx = variable.idx
         self.negated = negated
 
+    @staticmethod
+    def from_name(name, negated):
+        v = Variable(name)
+        return Literal(v, negated)
+
+    def __str__(self):
+        s = "~" if self.negated else ""
+        s += self.name
+        return s
+
+    def __repr__(self):
+        return str(self)
+
+    def negate(self):
+        self.negated = not self.negated
+        return self
+
 
 class Variable(object):
+
     _ids = count(-1)
 
     def __init__(self, name: str):
@@ -39,19 +57,20 @@ class Formula(object):
         self.left = left
         self.right = right
         self.is_leaf = is_leaf
+
         self.idx = next(self._ids)
 
     def __str__(self):
         # Variable
         if self.is_leaf:
-            return self.value.name
+            return self.value
 
         # Binary case
         if self.right:
-            return '({}{}{})'.format(self.left, self.operator.value, self.right)
+            return '({}{}{})'.format(self.left, self.operator, self.right)
 
         # Unary case
-        return '{}{}'.format(self.operator.value, self.left)
+        return '{}{}'.format(self.operator, self.left)
 
     @staticmethod
     def create_leaf(variable_name: str) -> 'Formula':
@@ -61,18 +80,17 @@ class Formula(object):
         return formula
 
     @staticmethod
-    def from_str(formula: str) -> 'Formula':
+    def from_str(formula: str):
 
         unary_operator_pattern = Formula.Operator.NEGATION.value
-        operators = map(lambda op: '\|' if op == Formula.Operator.OR.value else op,
-                        [op.value for op in Formula.Operator])
-        binary_operator_pattern = '|'.join([op for op in operators if op != unary_operator_pattern])
-        variable_pattern = '(T|F|[a-z]*\\d+)'
-        sub_formula_or_variable_pattern = '(?P<{side}>\(.*\)|{variable}|{unary}.*)'
+        binary_operator_pattern = '|'.join([op.value for op in Formula.Operator if op !=
+                                            Formula.Operator.NEGATION])
+        variable_pattern = '[a-z]*\\d+'
+        sub_formula_or_variable_pattern = '(?P<{side}>\(.*\)|{variable})'
         sub_formula_for_left_side = sub_formula_or_variable_pattern.format(
-            side='left', variable=variable_pattern, unary=unary_operator_pattern)
+            side='left', variable=variable_pattern)
         sub_formula_for_right_side = sub_formula_or_variable_pattern.format(
-            side='right', variable=variable_pattern, unary=unary_operator_pattern)
+            side='right', variable=variable_pattern)
         unary_formula_pattern = '(?P<op>{unary}){sub_formula}'.format(
             unary=unary_operator_pattern, sub_formula=sub_formula_for_left_side)
         binary_formula_pattern = '\({left}(?P<op>{binary}){right}\)'.format(
@@ -103,3 +121,8 @@ class Formula(object):
         op = Formula.Operator(m.group('op'))
 
         return Formula(left, right, op)
+
+
+if __name__ == '__main__':
+    # print(f'{Formula.Operator.NEGATION}/((.*)/)')
+    Formula.from_str("~(asdsa12&x12)")
