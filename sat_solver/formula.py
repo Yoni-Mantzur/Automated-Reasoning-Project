@@ -12,7 +12,7 @@ class Literal(object):
 
 
 class Variable(object):
-    _ids = count(0)
+    _ids = count(-1)
 
     def __init__(self, name: str):
         self.name = name
@@ -27,7 +27,7 @@ class Formula(object):
         AND = '&'
         NEGATION = '~'
 
-    _ids = count(0)
+    _ids = count(-1)
 
     def __init__(self,
                  left: Optional['Formula'] = None,
@@ -39,7 +39,6 @@ class Formula(object):
         self.left = left
         self.right = right
         self.is_leaf = is_leaf
-
         self.idx = next(self._ids)
 
     def __str__(self):
@@ -62,7 +61,7 @@ class Formula(object):
         return formula
 
     @staticmethod
-    def from_str(formula: str):
+    def from_str(formula: str) -> 'Formula':
 
         unary_operator_pattern = Formula.Operator.NEGATION.value
         operators = map(lambda op: '\|' if op == Formula.Operator.OR.value else op,
