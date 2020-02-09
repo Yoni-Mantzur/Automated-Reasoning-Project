@@ -1,5 +1,7 @@
 import re
 from enum import Enum
+from itertools import count
+from typing import Optional
 
 
 class Literal(object):
@@ -10,12 +12,12 @@ class Literal(object):
 
 
 class Variable(object):
-    variable_counter = 0
+
+    _ids = count(0)
 
     def __init__(self, name: str):
         self.name = name
-        self.idx = Variable.variable_counter
-        Variable.variable_counter += 1
+        self.idx = next(self._ids)
 
 
 class Formula(object):
@@ -26,44 +28,84 @@ class Formula(object):
         AND = '&'
         NEGATION = '~'
 
-    def __init__(self, left: 'Formula', right: 'Formula', operator: Operator):
+    _ids = count(0)
+
+    def __init__(self,
+                 left: Optional['Formula'] = None,
+                 right: Optional['Formula'] = None,
+                 operator: Optional[Operator] = None,
+                 is_leaf: bool = False):
+
         self.operator = operator
         self.left = left
         self.right = right
+        self.is_leaf = is_leaf
+
+        self.idx = next(self._ids)
+
+    def __str__(self):
+        # Variable
+        if self.is_leaf:
+            return self.value
+
+        # Binary case
+        if self.right:
+            return '({}{}{})'.format(self.left, self.operator, self.right)
+
+        # Unary case
+        return '{}{}'.format(self.operator, self.left)
+
+    @staticmethod
+    def create_leaf(variable_name: str) -> 'Formula':
+        formula = Formula(is_leaf=True)
+        variable = Variable(variable_name)
+        formula.__setattr__('value', variable)
+        return formula
 
     @staticmethod
     def from_str(formula: str):
+
         unary_operator_pattern = Formula.Operator.NEGATION.value
         binary_operator_pattern = '|'.join([op.value for op in Formula.Operator if op !=
                                             Formula.Operator.NEGATION])
         variable_pattern = '[a-z]*\\d+'
-        unary_formula_pattern = '(?P<{unary}>)(\((?P<left>.*)\)|({variable})*)'.format(
-            unary=unary_operator_pattern, variable=variable_pattern)
-        sub_formula_pattern = '(\((?P<left>.*)\)(?P<{binary}>.*)'
+        sub_formula_or_variable_pattern = '(?P<{side}>\(.*\)|{variable})'
+        sub_formula_for_left_side = sub_formula_or_variable_pattern.format(
+            side='left', variable=variable_pattern)
+        sub_formula_for_right_side = sub_formula_or_variable_pattern.format(
+            side='right', variable=variable_pattern)
+        unary_formula_pattern = '(?P<op>{unary}){sub_formula}'.format(
+            unary=unary_operator_pattern, sub_formula=sub_formula_for_left_side)
+        binary_formula_pattern = '\({left}(?P<op>{binary}){right}\)'.format(
+            left=sub_formula_for_left_side, binary=binary_operator_pattern, right=sub_formula_for_right_side)
 
-        m = re.match('%s' % sub_formula_pattern, formula)
+        m_variable = re.match(variable_pattern, formula)
+        m_unary = re.match(unary_formula_pattern, formula)
+        m_binary = re.match(binary_formula_pattern, formula)
 
-        left = m.group(sub_formula_group_name)
-        right = m.group(sub_formula_group_name)
-
-        formula_left = Formula.from_str(left)
-        formula_right = Formula.from_str(right)
-
-        if not left and not right:
-            return None
+        if m_variable:
+            variable_name = m_variable.group()
+            return Formula.create_leaf(variable_name)
 
         # Unary case
-        if not right:
-            operator = Formula.Operator(formula[0])
+        if m_unary:
+            m = m_unary
+            right = None
+
+        # Binary case
+        elif m_binary:
+            m = m_binary
+            right = Formula.from_str(m_binary.group('right'))
 
         else:
-            operator = Formula.Operator(formula[len(left)])
+            raise Exception
 
-        return Formula(formula_left, formula_right, operator)
+        left = Formula.from_str(m.group('left'))
+        op = Formula.Operator(m.group('op'))
 
-    def satisfied(self, assignment: PartialAssignment):
+        return Formula(left, right, op)
 
 
 if __name__ == '__main__':
     # print(f'{Formula.Operator.NEGATION}/((.*)/)')
-    Formula.from_str("(g&(~asdsa)")
+    Formula.from_str("~(asdsa12&x12)")
