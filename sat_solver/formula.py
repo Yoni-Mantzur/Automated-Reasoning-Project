@@ -23,6 +23,12 @@ class Literal(object):
     def __repr__(self):
         return str(self)
 
+    def __eq__(self, other):
+        return self.name == other.name and self.idx == other.idx and self.negated == other.negated
+
+    def __hash__(self):
+        return hash(self.name) + hash(self.idx) + hash(self.negated)
+
     def negate(self):
         self.negated = not self.negated
         return self
@@ -40,22 +46,18 @@ class Variable(object):
 class Formula(object):
     class Operator(Enum):
         IMPLIES = '->'
-        BICONDITIONAL = '<->'
+        IFF = '<->'
         OR = '|'
         AND = '&'
         NEGATION = '~'
 
-    @classmethod
-    def init_counter(cls):
-        if not hasattr(cls, '_ids'):
-            cls._ids = count(-1)
+    _ids = count(-1)
 
     def __init__(self,
                  left: Optional['Formula'] = None,
                  right: Optional['Formula'] = None,
                  operator: Optional[Operator] = None,
                  is_leaf: bool = False):
-        self.init_counter()
         self.operator = operator
         self.left = left
         self.right = right
@@ -84,7 +86,6 @@ class Formula(object):
 
     @classmethod
     def from_str(cls, formula: str) -> 'Formula':
-        cls.init_counter()
         unary_operator_pattern = Formula.Operator.NEGATION.value
 
         operators = map(lambda op: '\|' if op == Formula.Operator.OR.value else op, [op.value for op in Formula.Operator])

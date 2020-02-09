@@ -1,5 +1,5 @@
 from copy import copy
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Set
 
 from sat_solver.formula import Formula, Literal
 
@@ -36,7 +36,7 @@ def convert_iff_cnf(lhs: Literal, rhs1: Literal, rhs2: Optional[Literal], operat
     if operation == Formula.Operator.IMPLIES:
         # x <--> (y -> z) iff x <--> (~y || z)
         return convert_iff_cnf_basic(lhs, copy(rhs1).negate(), rhs2, Formula.Operator.OR)
-    if operation == Formula.Operator.BICONDITIONAL:
+    if operation == Formula.Operator.IFF:
         # x <--> (y <--> z) iff x <--> (y -> z) & x <--> (z -> y)
         return convert_iff_cnf(lhs, rhs1, rhs2, Formula.Operator.IMPLIES) + convert_iff_cnf(lhs, rhs2, rhs1,
                                                                                             Formula.Operator.IMPLIES)
@@ -45,6 +45,10 @@ def convert_iff_cnf(lhs: Literal, rhs1: Literal, rhs2: Optional[Literal], operat
 
 
 def tseitins_transformation(formula: Formula):
+    # for testing propose
+    if not formula:
+        return None
+
     new_variables = {}
 
     def recursion_tseitins_transformation(subformula: Formula):
@@ -81,7 +85,17 @@ def tseitins_transformation(formula: Formula):
 
 class CnfFormula(object):
 
-    def __init__(self, formula: Formula):
-        self.formula = tseitins_transformation(formula)  # type: List[List[Literal]]
-        # TODO: Yuval
-        self.variable_to_clause = {}  # type: Dict[int, int]
+    def __init__(self, clauses: List[List[Literal]] = None, literal_to_clauses: Dict[Literal, Set[int]] = None):
+        self.clauses = clauses
+        self.literal_to_clauses = literal_to_clauses
+
+    @staticmethod
+    def from_str(formula: str):
+        clauses = tseitins_transformation(Formula.from_str(formula))
+        return CnfFormula(clauses)
+
+    def __str__(self):
+        return str(self.clauses)
+
+    def __repr__(self):
+        return str(self)
