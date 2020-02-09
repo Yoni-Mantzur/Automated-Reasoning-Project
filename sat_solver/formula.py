@@ -45,14 +45,17 @@ class Formula(object):
         AND = '&'
         NEGATION = '~'
 
-    _ids = count(-1)
+    @classmethod
+    def init_counter(cls):
+        if not hasattr(cls, '_ids'):
+            cls._ids = count(-1)
 
     def __init__(self,
                  left: Optional['Formula'] = None,
                  right: Optional['Formula'] = None,
                  operator: Optional[Operator] = None,
                  is_leaf: bool = False):
-
+        self.init_counter()
         self.operator = operator
         self.left = left
         self.right = right
@@ -79,9 +82,9 @@ class Formula(object):
         formula.__setattr__('value', variable)
         return formula
 
-    @staticmethod
-    def from_str(formula: str) -> 'Formula':
-
+    @classmethod
+    def from_str(cls, formula: str) -> 'Formula':
+        cls.init_counter()
         unary_operator_pattern = Formula.Operator.NEGATION.value
 
         operators = map(lambda op: '\|' if op == Formula.Operator.OR.value else op, [op.value for op in Formula.Operator])

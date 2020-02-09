@@ -35,7 +35,7 @@ def convert_iff_cnf_basic(lhs: Literal, rhs1: Literal, rhs2: Optional[Literal], 
 def convert_iff_cnf(lhs: Literal, rhs1: Literal, rhs2: Optional[Literal], operation: Formula.Operator):
     if operation == Formula.Operator.IMPLIES:
         # x <--> (y -> z) iff x <--> (~y || z)
-        return convert_iff_cnf_basic(lhs, rhs1.negate(), rhs2, Formula.Operator.OR)
+        return convert_iff_cnf_basic(lhs, copy(rhs1).negate(), rhs2, Formula.Operator.OR)
     if operation == Formula.Operator.BICONDITIONAL:
         # x <--> (y <--> z) iff x <--> (y -> z) & x <--> (z -> y)
         return convert_iff_cnf(lhs, rhs1, rhs2, Formula.Operator.IMPLIES) + convert_iff_cnf(lhs, rhs2, rhs1,

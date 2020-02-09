@@ -1,5 +1,8 @@
+from itertools import count
+import pytest
+
 from sat_solver.cnf_formula import tseitins_transformation
-from sat_solver.formula import Formula
+from sat_solver.formula import Formula, Variable
 
 
 def test_simple_tseitins_transformation():
@@ -24,7 +27,6 @@ def test_simple_tseitins_transformation():
     assert all([set(expected) in actual_cnf_set for expected in expected_result])
 
 
-
 def test_simple_negate_tseitins_transformation():
     # Formula: ~r1
     # Actual Result: ~r1 & ~tse0 || tse0 & r1 || tse0
@@ -40,6 +42,7 @@ def test_simple_negate_tseitins_transformation():
     assert len(expected_result) == len(actual_cnf)
     assert all([set(expected) in actual_cnf_set for expected in expected_result])
 
+
 def test_complex_negate_tseitins_transformation():
     # Formula: ~(r1|r2)
     # Actual Result: tse1
@@ -51,8 +54,8 @@ def test_complex_negate_tseitins_transformation():
 
     actual_cnf_set = [set(map(str, ls)) for ls in actual_cnf]
 
-    print(actual_cnf)
-    print(expected_result)
+    # print(actual_cnf)
+    # print(expected_result)
     assert len(expected_result) == len(actual_cnf)
     assert all([set(expected) in actual_cnf_set for expected in expected_result])
 
@@ -82,16 +85,15 @@ def test_complex_tseitins_transformation():
                        ['~p1', '~q1', 'tse3']]
 
     actual_cnf_set = [set(map(str, ls)) for ls in actual_cnf]
-    actual_expected_set = [set(ls) for ls in expected_result]
-    print(actual_cnf)
-    print(expected_result)
+    
+    # print(actual_cnf)
+    # print(expected_result)
     assert len(expected_result) == len(actual_cnf)
     # assert actual_expected_set == actual_cnf_set
     assert all([set(expected) in actual_cnf_set for expected in expected_result])
 
 
-
-if __name__ == "__main__":
-    # test_complex_negate_tseitins_transformation()
-    # test_simple_negate_tseitins_transformation()
-    test_complex_tseitins_transformation()
+@pytest.fixture(autouse=True)
+def clean_counters():
+    Variable._ids = count(-1)
+    Formula._ids = count(-1)
