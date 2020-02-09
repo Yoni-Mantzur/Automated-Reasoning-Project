@@ -1,0 +1,97 @@
+from sat_solver.cnf_formula import tseitins_transformation
+from sat_solver.formula import Formula
+
+
+def test_simple_tseitins_transformation():
+    # Formula: (x1 & x2) || x3
+    # Actual Result: tse4 & (tse4 \iff p_g1 || x3) & (tse3 \iff x1 & x2)
+    # tse4 & (~tse4 || tse3 || x3) & (tse4 || ~tse3) & (tse4 || ~x3) &
+    # & (tse3 || ~x1 || ~x2) & (~tse3 || x1) & (~tse3 || x2)
+    x1 = Formula.create_leaf("x1")
+    x2 = Formula.create_leaf("x2")
+    x3 = Formula.create_leaf("x3")
+    x1andx2 = Formula(x1, x2, Formula.Operator.AND)
+    f = Formula(x1andx2, x3, Formula.Operator.OR)
+
+    actual_cnf = tseitins_transformation(f)
+    actual_cnf_set = [set(map(str, ls)) for ls in actual_cnf]
+    expected_result = [['tse3'], ['~tse3', 'tse2', 'x3'], ['tse3', '~tse2'], ['tse3', '~x3'], ['tse2', '~x1', '~x2'],
+                       ['~tse2', 'x1'], ['~tse2', 'x2']]
+
+    # print(actual_cnf)
+    # print(expected_result)
+    assert len(expected_result) == len(actual_cnf)
+    assert all([set(expected) in actual_cnf_set for expected in expected_result])
+
+
+
+def test_simple_negate_tseitins_transformation():
+    # Formula: ~r1
+    # Actual Result: ~r1 & ~tse0 || tse0 & r1 || tse0
+
+    f = Formula.from_str('~r1')
+    actual_cnf = tseitins_transformation(f)
+    expected_result = [['tse0'], ['~tse0', '~r1'], ['r1', 'tse0']]
+
+    actual_cnf_set = [set(map(str, ls)) for ls in actual_cnf]
+
+    # print(actual_cnf)
+    # print(expected_result)
+    assert len(expected_result) == len(actual_cnf)
+    assert all([set(expected) in actual_cnf_set for expected in expected_result])
+
+def test_complex_negate_tseitins_transformation():
+    # Formula: ~(r1|r2)
+    # Actual Result: tse1
+
+    f = Formula.from_str('~(r1|r2)')
+    actual_cnf = tseitins_transformation(f)
+    expected_result = [['tse2'], ['~tse1', 'r1', 'r2'], ['~r1', 'tse1'], ['~r2', 'tse1'], ['~tse2', '~tse1'],
+                       ['tse2', 'tse1']]
+
+    actual_cnf_set = [set(map(str, ls)) for ls in actual_cnf]
+
+    print(actual_cnf)
+    print(expected_result)
+    assert len(expected_result) == len(actual_cnf)
+    assert all([set(expected) in actual_cnf_set for expected in expected_result])
+
+
+def test_complex_tseitins_transformation():
+    # Formula: ~(~(p & q) -> ~r)
+    # Actual Result: tse6 & (~tse6 || ~tse5) & (tse6 || tse5) & (~tse5 || ~tse4 || ~r1)
+    # & (tse4 || tse5) & (tse5 || r1) & (~tse4 || tse3) & (tse4 || tse3) & (~tse3 || p1)
+    # & (~tse3 || q1) & (~p || ~q || tse3)
+
+    f = Formula.from_str('~(~(p1&q1)->~r1)')
+
+    actual_cnf = tseitins_transformation(f)
+    # expected_result = [['tse6'], ['~tse6', '~tse5'], ['tse6', 'tse5'], ['~tse5', '~tse4', '~r1'], #['~tse0', '~r1'], ['r1', 'tse0'],
+    #                    ['tse4', 'tse5'],
+    #                    ['tse5', 'r1'], ['~tse4', 'tse3'], ['tse4', 'tse3'], ['~tse3', 'p1'], ['~tse3', 'q1'],
+    #                    ['~p1', '~q1', 'tse3']]
+
+    # expected_result = [['tse8'], ['~tse8', '~tse7'], ['tse8', 'tse7'], ['~tse7', '~tse6', 'tse2'],
+    #                    ['~tse2', '~r1'], ['r1', 'tse2'], ['tse6', 'tse7'], ['tse7', '~tse2'],
+    #                    ['~tse6', '~tse5'], ['tse6', 'tse5'], ['~tse5', 'p1'], ['~tse5', 'q1'],
+    #                    ['~p1', '~q1', 'tse5']]
+
+    expected_result = [['tse6'], ['~tse6', '~tse5'], ['tse6', 'tse5'], ['~tse5', '~tse4', 'tse0'],
+                       ['~tse0', '~r1'], ['r1', 'tse0'], ['tse4', 'tse5'], ['tse5', '~tse0'],
+                       ['~tse4', '~tse3'], ['tse4', 'tse3'], ['~tse3', 'p1'], ['~tse3', 'q1'],
+                       ['~p1', '~q1', 'tse3']]
+
+    actual_cnf_set = [set(map(str, ls)) for ls in actual_cnf]
+    actual_expected_set = [set(ls) for ls in expected_result]
+    print(actual_cnf)
+    print(expected_result)
+    assert len(expected_result) == len(actual_cnf)
+    # assert actual_expected_set == actual_cnf_set
+    assert all([set(expected) in actual_cnf_set for expected in expected_result])
+
+
+
+if __name__ == "__main__":
+    # test_complex_negate_tseitins_transformation()
+    # test_simple_negate_tseitins_transformation()
+    test_complex_tseitins_transformation()

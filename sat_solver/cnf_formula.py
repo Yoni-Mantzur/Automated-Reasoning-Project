@@ -13,7 +13,6 @@ def convert_iff_cnf_basic(lhs: Literal, rhs1: Literal, rhs2: Optional[Literal], 
     :param operation: right hand side operation
     :return: list of or clauses, each clause is a list of literals with OR between them
     '''
-    # TODO: Support Implies and Bidirectional using recursion
     assert operation in [Formula.Operator.AND, Formula.Operator.OR, Formula.Operator.NEGATION]
     assert (operation == Formula.Operator.NEGATION and rhs2 is None) or (
             operation != Formula.Operator.NEGATION and rhs2 is not None)
@@ -47,7 +46,6 @@ def convert_iff_cnf(lhs: Literal, rhs1: Literal, rhs2: Optional[Literal], operat
 
 def tseitins_transformation(formula: Formula):
     new_variables = {}
-    all_clauses = []
 
     def recursion_tseitins_transformation(subformula: Formula):
         if subformula is None or subformula.is_leaf:
@@ -75,9 +73,6 @@ def tseitins_transformation(formula: Formula):
         if subformula.idx not in new_variables:
             new_variables[subformula.idx] = Literal.from_name("tse{}".format(subformula.idx), negated=False)
 
-        # FOR DEBUG:
-        literals = convert_iff_cnf(new_variables[subformula.idx], rhs1=l_var, rhs2=r_var, operation=subformula.operator)
-
         return convert_iff_cnf(new_variables[subformula.idx], rhs1=l_var, rhs2=r_var, operation=subformula.operator) + \
                recursion_tseitins_transformation(subformula.right) + recursion_tseitins_transformation(subformula.left)
 
@@ -88,4 +83,5 @@ class CnfFormula(object):
 
     def __init__(self, formula: Formula):
         self.formula = tseitins_transformation(formula)  # type: List[List[Literal]]
+        # TODO: Yuval
         self.variable_to_clause = {}  # type: Dict[int, int]
