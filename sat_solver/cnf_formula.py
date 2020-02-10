@@ -89,6 +89,7 @@ class CnfFormula(object):
         self.clauses = clauses
         self.literal_to_clauses = literal_to_clauses
 
+
     @staticmethod
     def from_str(formula: str):
         clauses = tseitins_transformation(SatFormula.from_str(formula))
@@ -98,8 +99,44 @@ class CnfFormula(object):
         # The formula holds literls, convert to variable and remove duplicates
         return list(set([v.variable for subformula in self.clauses for v in subformula]))
 
+    def get_literals(self):
+        return set([v.name for subformula in self.clauses for v in subformula])
+
     def __str__(self):
         return str(self.clauses)
 
     def __repr__(self):
         return str(self)
+
+    def add_clause(self, literals):
+        self.clauses += literals
+        for lit in literals:
+            self.literal_to_clauses[lit].update(len(self.clauses))
+
+    def remove_clause(self, indices):
+        if isinstance(indices, int):
+            indices = [indices]
+
+        for idx in sorted(indices, reverse=True):
+            for lit in self.clauses[idx]:
+                self.literal_to_clauses[lit].remove(idx)
+            self.clauses[idx] = []
+        return True
+
+    def remove_literal(self, clause_idx, literal):
+        if len(self.clauses[clause_idx]) == 1:
+            # In this situation we want to delete a literal from the clause but it is the last one, UNSAT
+            return False
+        self.clauses[clause_idx].remove(literal)
+        self.literal_to_clauses[literal] = {}
+        return True
+
+    def get_literal_appears_max(self):
+        def keywithmaxval(d):
+            # https://stackoverflow.com/a/12343826
+            v = [len(ls) for ls in d.values()]
+            k = list(d.keys())
+            return k[v.index(max(v))]
+
+        # TODO: Might be helpful to keep the literal that apperas the most (for the decision heuristic)
+        return keywithmaxval(self.literal_to_clauses)

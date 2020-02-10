@@ -2,8 +2,8 @@ from itertools import count
 import pytest
 
 from sat_solver.cnf_formula import tseitins_transformation
-from sat_solver.formula import SatFormula, Variable
-
+from sat_solver.sat_formula import SatFormula, Variable
+from common.operator import Operator
 
 def test_simple_tseitins_transformation():
     # Formula: (x1 & x2) || x3
@@ -13,8 +13,8 @@ def test_simple_tseitins_transformation():
     x1 = SatFormula.create_leaf("x1")
     x2 = SatFormula.create_leaf("x2")
     x3 = SatFormula.create_leaf("x3")
-    x1andx2 = SatFormula(x1, x2, SatFormula.Operator.AND)
-    f = SatFormula(x1andx2, x3, SatFormula.Operator.OR)
+    x1andx2 = SatFormula(x1, x2,Operator.AND)
+    f = SatFormula(x1andx2, x3, Operator.OR)
 
     actual_cnf = tseitins_transformation(f)
     actual_cnf_set = [set(map(str, ls)) for ls in actual_cnf]

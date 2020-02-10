@@ -1,15 +1,14 @@
 from copy import copy, deepcopy
-from collections import defaultdict, OrderedDict
 
 from sat_solver.cnf_formula import CnfFormula
-from sat_solver.formula import Literal
-from sat_solver.preprocessor import preprocess
+from sat_solver.sat_formula import Literal
 
 
+# TODO: Do we need to implement also pure literal?
 class DPLL(object):
-    def __init__(self, cnf_forumla: CnfFormula, partial_assignment = {}):
-
+    def __init__(self, cnf_forumla: CnfFormula, partial_assignment={}):
         self.formula = cnf_forumla
+
         self._assignment = partial_assignment
         if self.formula is not None:
             self.formula = self.unit_propagation(self.formula)
@@ -38,17 +37,13 @@ class DPLL(object):
         # We decided that lit is True (lit might be ~x_1, then x_1 is False)
         # Remove all clauses that has lit (they are satisfied), and delete ~lit from all other clauses
         removed_clauses = set(formula.literal_to_clauses[literal])
-
-        for idx in sorted(removed_clauses, reverse=True):
-            formula.clauses[idx] = []
+        formula.remove_clause(removed_clauses)
 
         for idx in formula.literal_to_clauses[negate_lit]:
-            if len(formula.clauses[idx]) == 0:
-                continue
-            if len(formula.clauses[idx]) == 1:
-                # In this situation we want to delete a literal from the clause but it is the last one, UNSAT
+            # if len(formula.clauses[idx]) == 0:
+            #     continue
+            if not formula.remove_literal(idx, negate_lit):
                 return None
-            formula.clauses[idx].remove(negate_lit)
 
         return formula
 
@@ -57,6 +52,9 @@ class DPLL(object):
         Perform unit propoagation on the given cnf formula (editing the formula)
         :return the formula after unit propogation
         '''
+        if formula is None:
+            return None
+
         found = True
         while found == True:
             found = False
@@ -70,6 +68,13 @@ class DPLL(object):
 
         return formula
 
+    def decision_heuristic(self):
+        '''
+        Implement the Dynamic Largest Individual Sum (DLIS) heuristic
+        :return: the literal which has maximum appears in clauses
+        '''
+        return self.formula.get_literal_appears_max()
+
     def search(self):
         if self.formula is None:
             # Formula is unsat
@@ -80,8 +85,8 @@ class DPLL(object):
             self.unsat = False
             return True
 
-        current_variables = self.formula.get_variables()
-        next_decision = current_variables[0]
+        # current_variables = self.formula.get_variables()
+        next_decision = self.decision_heuristic()
 
         for d in [True, False]:
             formula = deepcopy(self.formula)
@@ -94,13 +99,3 @@ class DPLL(object):
                 return sat
 
         return False
-
-
-
-
-# if __name__ == "__main__":
-#     f = CnfFormula.from_str("(x1|~x2)&x3")
-#     print(f)
-#     d = DPLL(f)
-#     d.unit_propagation()
-#     print(d._formulas[-1])

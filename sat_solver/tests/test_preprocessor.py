@@ -1,7 +1,7 @@
 import pytest
 
 from sat_solver.cnf_formula import CnfFormula
-from sat_solver.formula import Literal, Variable
+from sat_solver.sat_formula import Literal, Variable
 from sat_solver.preprocessor import remove_redundant_literals, delete_trivial_clauses
 
 v1 = Variable(name='v1')
