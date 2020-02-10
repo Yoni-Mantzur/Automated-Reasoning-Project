@@ -1,4 +1,5 @@
 import re
+from abc import abstractmethod
 from itertools import count
 from typing import List, Dict, Optional
 
@@ -13,6 +14,12 @@ class Term(object):
     def __init__(self, name):
         self.idx = next(self._ids)
         self.name = name
+
+    def get_terms(self):
+        return []
+
+    def get_functions(self):
+        return []
 
     @staticmethod
     def from_str(term: str) -> 'Term':
@@ -34,6 +41,9 @@ class PureTerm(Term):
         super(PureTerm, self).__init__(name)
         self.name = name
 
+    def get_terms(self):
+        return [self]
+
     @staticmethod
     def from_str(term: str) -> 'Term':
         return PureTerm(term)
@@ -51,12 +61,25 @@ class FunctionTerm(Term):
         super(FunctionTerm, self).__init__(name)
         self.input_terms = input_terms
 
+    def get_terms(self):
+        terms = []
+        for input_term in self.input_terms:
+            terms.append(input_term.get_terms())
+        return terms
+
+    def get_functions(self):
+        functions = [self]
+        for input_term in self.input_terms:
+            functions.append(input_term.get_functions())
+        return functions
+
     @staticmethod
     def from_str(term: str) -> Term:
         m = re.match(function_pattern, term)
         assert m;
         function_name = m.group('function_name')
         inputs = m.group('inputs').strip().split(',')
+        # TODO: handle nested functions
         inputs_terms = list(map(lambda term: Term.from_str(term), inputs))
 
         return FunctionTerm(function_name, inputs_terms)
@@ -75,6 +98,12 @@ class EquationTerm(Term):
         self.name = 'v%d' % self.idx
         self.lhs = lhs
         self.rhs = rhs
+
+    def get_terms(self):
+        return self.lhs.get_terms() + self.rhs.get_terms()
+
+    def get_functions(self):
+        return self.lhs.get_functions() + self.rhs.get_functions()
 
     @staticmethod
     def from_str(term: str) -> Term:
@@ -97,10 +126,10 @@ class Formula(object):
                  sat_formula: Optional[SatFormula] = None,
                  var_to_equation_mapping: Optional[Dict[str, EquationTerm]] = None):
 
-        self.functions = []
-        self.terms = []
         self.var_equation_mapping = var_to_equation_mapping or dict()
         self.sat_formula = sat_formula
+        self.terms = []  # type: List[PureTerm]
+        self.functions = []  # type: List[EquationTerm]
 
     def __str__(self):
         formula = str(self.sat_formula)
@@ -111,11 +140,6 @@ class Formula(object):
     def __repr__(self):
         return 'Formula(functions: %s\n equations: %s\n terms: %s\n encoded formula: %s' % \
                (str(self.functions), str(self.var_equation_mapping.values()), str(self.terms), str(self.sat_formula))
-
-    @property
-    def equations(self) -> List[EquationTerm]:
-        return list(self.var_equation_mapping.values())
-
 
     @staticmethod
     def from_str(raw_formula: str) -> 'Formula':
@@ -145,4 +169,25 @@ class Formula(object):
 
         formula = Formula()
         formula.sat_formula = from_str_helper(raw_formula)
+        formula.get_terms(update=True)
+        formula.get_functions(update=True)
         return formula
+
+    def get_terms(self, update=False) -> List[Term]:
+        if update or not self.terms:
+            self.terms = []
+            for equation in self.var_equation_mapping.values():
+                self.terms += equation.get_terms()
+
+        return self.terms
+
+    def get_functions(self, update=False) -> List[Term]:
+        if update or not self.terms:
+            self.functions = []
+            for equation in self.var_equation_mapping.values():
+                self.terms += equation.get_functions()
+
+        return self.functions
+
+    def get_equations(self) -> List[Term]:
+        return list(self.var_equation_mapping.values())
