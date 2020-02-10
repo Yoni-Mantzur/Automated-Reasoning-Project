@@ -94,6 +94,10 @@ class CnfFormula(object):
         clauses = tseitins_transformation(Formula.from_str(formula))
         return CnfFormula(clauses)
 
+    def get_variables(self):
+        # The formula holds literls, convert to variable and remove duplicates
+        return list(set([v.variable for subformula in self.clauses for v in subformula]))
+
     def __str__(self):
         return str(self.clauses)
 

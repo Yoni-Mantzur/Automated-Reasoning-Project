@@ -9,6 +9,7 @@ class Literal(object):
         self.name = variable.name
         self.idx = variable.idx
         self.negated = negated
+        self.variable = variable
 
     @staticmethod
     def from_name(name, negated):
@@ -42,6 +43,11 @@ class Variable(object):
         self.name = name
         self.idx = next(self._ids)
 
+    def __eq__(self, other):
+        return self.name == other.name and self.idx == other.idx
+
+    def __hash__(self):
+        return hash(self.name) + hash(self.idx)
 
 class Formula(object):
     class Operator(Enum):
