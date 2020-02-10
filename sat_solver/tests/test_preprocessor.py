@@ -13,6 +13,15 @@ l3 = Literal(v2, negated=False)
 l4 = Literal(v2, negated=True)
 
 
+def test_literal_to_clauses():
+    formula = CnfFormula([[l1, l2], [l1, l1, l3]])
+    expected_literal_to_clause = {l1: {0, 1}, l2: {0}, l3: {1}}
+
+    actual_formula = remove_redundant_literals(formula)
+
+    assert str(expected_literal_to_clause) == str(dict(actual_formula.literal_to_clauses))
+
+
 def test_remove_redundant_literals():
     formula = CnfFormula([[l1, l2], [l1, l1, l3]])
     expected_formula = CnfFormula([[l1, l2], [l1, l3]])
@@ -29,6 +38,7 @@ def test_delete_trivial_clauses():
     actual_formula = delete_trivial_clauses(formula)
 
     assert str(expected_formula) == str(actual_formula)
+
 
 def test_exception_raised_when_remove_redundant_literals_was_not_called_before():
     formula = CnfFormula([[l1, l2], [l1, l1, l3]])
