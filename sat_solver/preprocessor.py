@@ -2,7 +2,7 @@ from collections import defaultdict
 from typing import Set, Dict
 
 from sat_solver.cnf_formula import CnfFormula
-from sat_solver.formula import Literal
+from sat_solver.sat_formula import Literal
 
 
 def remove_redundant_literals(formula: CnfFormula) -> CnfFormula:

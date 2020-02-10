@@ -1,8 +1,11 @@
 import re
-from enum import Enum
+
 from itertools import count
 from typing import Optional
 
+from sat_solver.patterns import variable_pattern, unary_formula_pattern, binary_formula_pattern
+
+from common.operator import Operator
 
 class Literal(object):
     def __init__(self, variable, negated):
@@ -49,19 +52,12 @@ class Variable(object):
     def __hash__(self):
         return hash(self.name) + hash(self.idx)
 
-class Formula(object):
-    class Operator(Enum):
-        IMPLIES = '->'
-        IFF = '<->'
-        OR = '|'
-        AND = '&'
-        NEGATION = '~'
-
+class SatFormula(object):
     _ids = count(-1)
 
     def __init__(self,
-                 left: Optional['Formula'] = None,
-                 right: Optional['Formula'] = None,
+                 left: Optional['SatFormula'] = None,
+                 right: Optional['SatFormula'] = None,
                  operator: Optional[Operator] = None,
                  is_leaf: bool = False):
         self.operator = operator
@@ -84,36 +80,21 @@ class Formula(object):
         return '{}{}'.format(self.operator.value, self.left)
 
     @staticmethod
-    def create_leaf(variable_name: str) -> 'Formula':
-        formula = Formula(is_leaf=True)
+    def create_leaf(variable_name: str) -> 'SatFormula':
+        formula = SatFormula(is_leaf=True)
         variable = Literal.from_name(variable_name, negated=False)
         formula.__setattr__('value', variable)
         return formula
 
     @classmethod
-    def from_str(cls, formula: str) -> 'Formula':
-        unary_operator_pattern = Formula.Operator.NEGATION.value
-
-        operators = map(lambda op: '\|' if op == Formula.Operator.OR.value else op, [op.value for op in Formula.Operator])
-        binary_operator_pattern = '|'.join([op for op in operators if op != unary_operator_pattern])
-        variable_pattern = '(T|F|[a-z]*\\d+)'
-        sub_formula_or_variable_pattern = '(?P<{side}>\(.*\)|{variable}|{unary}.*)'
-        sub_formula_for_left_side = sub_formula_or_variable_pattern.format(
-            side='left', variable=variable_pattern, unary=unary_operator_pattern)
-        sub_formula_for_right_side = sub_formula_or_variable_pattern.format(
-            side='right', variable=variable_pattern, unary=unary_operator_pattern)
-        unary_formula_pattern = '(?P<op>{unary}){sub_formula}'.format(
-            unary=unary_operator_pattern, sub_formula=sub_formula_for_left_side)
-        binary_formula_pattern = '\({left}(?P<op>{binary}){right}\)'.format(
-            left=sub_formula_for_left_side, binary=binary_operator_pattern, right=sub_formula_for_right_side)
-
+    def from_str(cls, formula: str) -> 'SatFormula':
         m_variable = re.match(variable_pattern, formula)
         m_unary = re.match(unary_formula_pattern, formula)
         m_binary = re.match(binary_formula_pattern, formula)
 
         if m_variable:
             variable_name = m_variable.group()
-            return Formula.create_leaf(variable_name)
+            return SatFormula.create_leaf(variable_name)
 
         # Unary case
         if m_unary:
@@ -123,12 +104,13 @@ class Formula(object):
         # Binary case
         elif m_binary:
             m = m_binary
-            right = Formula.from_str(m_binary.group('right'))
+            right = SatFormula.from_str(m_binary.group('right'))
 
         else:
             raise Exception
 
-        left = Formula.from_str(m.group('left'))
-        op = Formula.Operator(m.group('op'))
+        left = SatFormula.from_str(m.group('left'))
+        op = Operator(m.group('op'))
 
-        return Formula(left, right, op)
+        return SatFormula(left, right, op)
+

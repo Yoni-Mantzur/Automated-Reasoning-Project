@@ -1,10 +1,11 @@
 from copy import copy
 from typing import List, Dict, Optional, Set
 
-from sat_solver.formula import Formula, Literal
+from common.operator import Operator
+from sat_solver.sat_formula import SatFormula, Literal
 
 
-def convert_iff_cnf_basic(lhs: Literal, rhs1: Literal, rhs2: Optional[Literal], operation: Formula.Operator):
+def convert_iff_cnf_basic(lhs: Literal, rhs1: Literal, rhs2: Optional[Literal], operation: Operator):
     '''
     Convert x iff (y operation z) into a cnf format
     :param lhs: x in the example
@@ -13,45 +14,44 @@ def convert_iff_cnf_basic(lhs: Literal, rhs1: Literal, rhs2: Optional[Literal], 
     :param operation: right hand side operation
     :return: list of or clauses, each clause is a list of literals with OR between them
     '''
-    assert operation in [Formula.Operator.AND, Formula.Operator.OR, Formula.Operator.NEGATION]
-    assert (operation == Formula.Operator.NEGATION and rhs2 is None) or (
-            operation != Formula.Operator.NEGATION and rhs2 is not None)
+    assert operation in [Operator.AND, Operator.OR, Operator.NEGATION]
+    assert (operation == Operator.NEGATION and rhs2 is None) or (
+            operation != Operator.NEGATION and rhs2 is not None)
 
-    if operation == Formula.Operator.AND:
+    if operation == Operator.AND:
         # x iff y & z \rightarrow (~x || y) & (~x || z) & (~y || ~z || x)
         return [[copy(lhs).negate(), copy(rhs1)], [copy(lhs).negate(), copy(rhs2)],
                 [copy(rhs1).negate(), copy(rhs2).negate(), copy(lhs)]]
-    if operation == Formula.Operator.OR:
+    if operation == Operator.OR:
         # x iff y || z \rightarrow (~x || y || z) & (~y || x) & (~z || x)
         return [[copy(lhs).negate(), copy(rhs1), copy(rhs2)],
                 [copy(rhs1).negate(), copy(lhs)],
                 [copy(rhs2).negate(), copy(lhs)]]
-    if operation == Formula.Operator.NEGATION:
+    if operation == Operator.NEGATION:
         # x iff ~y  \rightarrow (~x || ~y) & (x || y)
         return [[copy(lhs).negate(), copy(rhs1).negate()],
                 [copy(rhs1), copy(lhs)]]
 
 
-def convert_iff_cnf(lhs: Literal, rhs1: Literal, rhs2: Optional[Literal], operation: Formula.Operator):
-    if operation == Formula.Operator.IMPLIES:
+def convert_iff_cnf(lhs: Literal, rhs1: Literal, rhs2: Optional[Literal], operation: Operator):
+    if operation == Operator.IMPLIES:
         # x <--> (y -> z) iff x <--> (~y || z)
-        return convert_iff_cnf_basic(lhs, copy(rhs1).negate(), rhs2, Formula.Operator.OR)
-    if operation == Formula.Operator.IFF:
+        return convert_iff_cnf_basic(lhs, copy(rhs1).negate(), rhs2, Operator.OR)
+    if operation == Operator.IFF:
         # x <--> (y <--> z) iff x <--> (y -> z) & x <--> (z -> y)
-        return convert_iff_cnf(lhs, rhs1, rhs2, Formula.Operator.IMPLIES) + convert_iff_cnf(lhs, rhs2, rhs1,
-                                                                                            Formula.Operator.IMPLIES)
+        return convert_iff_cnf(lhs, rhs1, rhs2, Operator.IMPLIES) + convert_iff_cnf(lhs, rhs2, rhs1, Operator.IMPLIES)
     else:
         return convert_iff_cnf_basic(lhs, rhs1, rhs2, operation)
 
 
-def tseitins_transformation(formula: Formula):
+def tseitins_transformation(formula: SatFormula):
     # for testing propose
     if not formula:
         return None
 
     new_variables = {}
 
-    def recursion_tseitins_transformation(subformula: Formula):
+    def recursion_tseitins_transformation(subformula: SatFormula):
         if subformula is None or subformula.is_leaf:
             return []
 
@@ -63,7 +63,7 @@ def tseitins_transformation(formula: Formula):
                                                                        negated=False)
             l_var = new_variables[subformula.left.idx]
 
-        if subformula.operator is Formula.Operator.NEGATION or subformula.right is None:
+        if subformula.operator is Operator.NEGATION or subformula.right is None:
             r_var = None
         else:
             if subformula.right.is_leaf:
@@ -91,7 +91,7 @@ class CnfFormula(object):
 
     @staticmethod
     def from_str(formula: str):
-        clauses = tseitins_transformation(Formula.from_str(formula))
+        clauses = tseitins_transformation(SatFormula.from_str(formula))
         return CnfFormula(clauses)
 
     def get_variables(self):
