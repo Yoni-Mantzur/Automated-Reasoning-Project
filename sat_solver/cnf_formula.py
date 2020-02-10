@@ -109,6 +109,7 @@ class CnfFormula(object):
         return str(self)
 
     def add_clause(self, literals):
+        # TODO: when using this dont forget to update the watch_literals
         self.clauses += literals
         for lit in literals:
             self.literal_to_clauses[lit].update(len(self.clauses))
@@ -119,24 +120,24 @@ class CnfFormula(object):
 
         for idx in sorted(indices, reverse=True):
             for lit in self.clauses[idx]:
+                # Update the literal_tp_clauses we use it in the decision heuristic
                 self.literal_to_clauses[lit].remove(idx)
             self.clauses[idx] = []
         return True
 
     def remove_literal(self, clause_idx, literal):
-        if len(self.clauses[clause_idx]) == 1:
-            # In this situation we want to delete a literal from the clause but it is the last one, UNSAT
-            return False
-        self.clauses[clause_idx].remove(literal)
+        # if len(self.clauses[clause_idx]) == 1:
+        #     # In this situation we want to delete a literal from the clause but it is the last one, UNSAT
+        #     return False
+        # self.clauses[clause_idx].remove(literal)
         self.literal_to_clauses[literal] = {}
         return True
 
-    def get_literal_appears_max(self):
-        def keywithmaxval(d):
-            # https://stackoverflow.com/a/12343826
-            v = [len(ls) for ls in d.values()]
-            k = list(d.keys())
-            return k[v.index(max(v))]
-
-        # TODO: Might be helpful to keep the literal that apperas the most (for the decision heuristic)
-        return keywithmaxval(self.literal_to_clauses)
+    def get_literal_appears_max(self, assignments):
+        literals_length = {k: len(v) for k,v in self.literal_to_clauses.items()}
+        literals_length_sorted = sorted(literals_length, key=literals_length.get, reverse=1)
+        for l in literals_length_sorted:
+            if l.name not in assignments:
+                return l.variable
+        # # TODO: Might be helpful to keep the literal that apperas the most (for the decision heuristic)
+        # return keywithmaxval(self.literal_to_clauses)
