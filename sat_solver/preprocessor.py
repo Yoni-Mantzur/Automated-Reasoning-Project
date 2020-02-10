@@ -23,8 +23,13 @@ def remove_redundant_literals(formula: CnfFormula) -> CnfFormula:
 def delete_trivial_clauses(formula: CnfFormula) -> CnfFormula:
     removed_clauses = set()
     new_clauses = []
+
+    if not formula.literal_to_clauses:
+        raise Exception("This function should be called after remove_redundant_literals function")
+
     for clause_number, clause in enumerate(formula.clauses):
 
+        # Assuming no literal redundancy - meaning, this function should be called after `remove_redundant_literals`
         variables = map(lambda literal: literal.idx, clause)
         if len(set(variables)) == len(clause):
             new_clauses.append(clause)
