@@ -27,12 +27,13 @@ def test_up_unsat():
 
     cnf = CnfFormula(clauses)
     cnf = preprocess(cnf)
-    dpll = DPLL(cnf, partial_assignment={}, watch_literals=defaultdict(set))
-    actual_cnf = dpll.unit_propagation(dpll.formula)
+
+    dpll = DPLL(cnf)
+    actual_cnf = dpll.unit_propagation()
 
     assert actual_cnf is None
-    assert not dpll.get_assignment()['x3']
-    assert dpll.get_assignment()['x2']
+    assert not dpll.get_full_assignment()['x3']
+    assert dpll.get_full_assignment()['x2']
 
 
 def test_up_simple():
@@ -52,13 +53,13 @@ def test_up_simple():
 
     cnf = CnfFormula(clauses)
     cnf = preprocess(cnf)
-    dpll = DPLL(cnf, partial_assignment={}, watch_literals=defaultdict(set))
-    actual_cnf = dpll.unit_propagation(cnf)
+    dpll = DPLL(cnf)
+    actual_cnf = dpll.unit_propagation()
     expected_cnf = [[x1,not_x2, x3], [not_x1, x3]]
 
-    assert dpll.get_assignment()['x2']
+    assert dpll.get_full_assignment()['x2']
     actual_cnf_real = [cl for cl in actual_cnf.clauses if cl != []]
-    assert actual_cnf_real == expected_cnf, dpll.get_assignment()
+    assert actual_cnf_real == expected_cnf, dpll.get_full_assignment()
 
 
 def test_search_simple():
@@ -78,7 +79,7 @@ def test_search_simple():
     # literal_to_clauses = {x1: {0}, x2: {0}, x3: {0}} #not_x1: {2}, not_x2: {0}
     cnf = CnfFormula(clauses)
     cnf = preprocess(cnf)
-    dpll = DPLL(cnf, partial_assignment={}, watch_literals=defaultdict(set))
+    dpll = DPLL(cnf)
     search_result = dpll.search()
     # print("(x1|x2|~x3) | (x3 | ~x2)", dpll.get_assignment())
     assert search_result
@@ -99,7 +100,7 @@ def test_search_simple_unsat():
     # literal_to_clauses = {x1: {0}, x2: {0}, x3: {0}} #not_x1: {2}, not_x2: {0}
     cnf = CnfFormula(clauses)
     cnf = preprocess(cnf)
-    dpll = DPLL(cnf, partial_assignment={}, watch_literals=defaultdict(set))
+    dpll = DPLL(cnf)
     search_result = dpll.search()
 
     assert not search_result
@@ -127,7 +128,7 @@ def test_search_complex():
     clauses = [[not_x1, x2], [not_x1,not_x2, not_x3], [not_x2, x4], [not_x4, not_x3]]
     cnf = CnfFormula(clauses)
     cnf = preprocess(cnf)
-    dpll = DPLL(cnf, partial_assignment={}, watch_literals=defaultdict(set))
+    dpll = DPLL(cnf)
     search_result = dpll.search()
     # print('(~x1 | x2) & (~x1 | ~x2 | ~x3) & (~x2 | x4) & (~x4| ~x3)\n', dpll.get_assignment())
     assert search_result
@@ -149,7 +150,7 @@ def test_search_complex_unsat():
     clauses = [[not_x1, x2, not_x3], [x3, not_x2, x1], [x1, x2], [not_x1, not_x2], [x3, x2], [not_x3, not_x2]]
     cnf = CnfFormula(clauses)
     cnf = preprocess(cnf)
-    dpll = DPLL(cnf, partial_assignment={}, watch_literals=defaultdict(set))
+    dpll = DPLL(cnf)
     search_result = dpll.search()
     # print(dpll.get_assignment())
     assert not search_result
@@ -160,9 +161,23 @@ def clean_counters():
     SatFormula._ids = count(-1)
 
 if __name__ == '__main__':
-    test_up_simple()
-#     test_search_complex()
-#     exit(0)
-    test_search_complex_unsat()
+    # test_up_unsat()
+    # print("*" * 100)
+    # print("pass test_up_unsat")
+    # print("*" * 100)
+    # test_up_simple()
+    # print("*" * 100)
+    # print("pass test_up_simple")
+    # print("*" * 100)
+    # test_search_complex_unsat()
+    # print("*" * 100)
+    # print("pass test_search_complex_unsat")
+    # print("*" * 100)
     test_search_complex()
-    # test_search_simple_unsat()
+    print("*" * 100)
+    print("pass test_search_complex")
+    print("*" * 100)
+    test_search_simple_unsat()
+    print("*" * 100)
+    print("pass test_search_simple_unsat")
+    print("*" * 100)

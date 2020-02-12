@@ -87,8 +87,8 @@ class CnfFormula(object):
 
     def __init__(self, clauses: List[List[Literal]] = None, literal_to_clauses: Dict[Literal, Set[int]] = None):
         self.clauses = clauses
+        self.empty_clauses = 0
         self.literal_to_clauses = literal_to_clauses
-
 
     @staticmethod
     def from_str(formula: str):
@@ -123,6 +123,10 @@ class CnfFormula(object):
                 # Update the literal_tp_clauses we use it in the decision heuristic
                 self.literal_to_clauses[lit].remove(idx)
             self.clauses[idx] = []
+            self.empty_clauses += 1
+        if self.empty_clauses == len(self.clauses):
+            return False
+
         return True
 
     def remove_literal(self, clause_idx, literal):
