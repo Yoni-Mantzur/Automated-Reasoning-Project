@@ -1,7 +1,7 @@
 import re
 from abc import abstractmethod
 from itertools import count
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple, cast
 
 from common.operator import Operator
 from sat_solver.sat_formula import SatFormula
@@ -74,15 +74,35 @@ class FunctionTerm(Term):
         return functions
 
     @staticmethod
-    def from_str(term: str) -> Term:
-        m = re.match(function_pattern, term)
-        assert m;
-        function_name = m.group('function_name')
-        inputs = m.group('inputs').strip().split(',')
-        # TODO: handle nested functions
-        inputs_terms = list(map(lambda term: Term.from_str(term), inputs))
+    def from_str(term: str) -> 'FunctionTerm':
+        def is_function(t: str) -> bool:
+            match = re.search(function_pattern, t)
+            return match and match.start() == 0
 
-        return FunctionTerm(function_name, inputs_terms)
+        def get_name(t: str) -> str:
+            return re.search(variable_pattern, t).group(1)
+
+        def extract_args(name: str, term_suffix: str) -> Tuple[List[Term], str]:
+            args = []
+            term_suffix = term_suffix[len(name) + 1:]
+            while term_suffix[0] != ')':
+                term, term_suffix = from_str_helper(term_suffix)
+                args.append(term)
+            return args, term_suffix
+
+        def from_str_helper(prefix_term: str) -> Tuple[Term, str]:
+            if prefix_term[0] == ',':
+                return from_str_helper(prefix_term[1:])
+
+            if is_function(prefix_term):
+                func_name = get_name(prefix_term)
+                args, prefix_term = extract_args(func_name, prefix_term)
+                return FunctionTerm(func_name, args), prefix_term[1:]
+
+            var_name = get_name(prefix_term)
+            return PureTerm(var_name), prefix_term[len(var_name):]
+
+        return cast(FunctionTerm, from_str_helper(term)[0])
 
     def __str__(self):
         return self.name + '({})'.format(','.join([str(term) for term in self.input_terms]))
