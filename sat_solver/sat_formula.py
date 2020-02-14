@@ -46,6 +46,12 @@ class Variable(object):
         self.name = name
         self.idx = next(self._ids)
 
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return str(self)
+
     def __eq__(self, other):
         return self.name == other.name and self.idx == other.idx
 
