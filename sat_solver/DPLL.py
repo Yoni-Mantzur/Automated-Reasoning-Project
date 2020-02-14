@@ -1,6 +1,7 @@
 from collections import defaultdict
 from copy import copy, deepcopy
 from random import randint
+from typing import Optional
 
 from sat_solver.cnf_formula import CnfFormula
 from sat_solver.sat_formula import Literal, Variable
@@ -8,16 +9,18 @@ from sat_solver.sat_formula import Literal, Variable
 
 # TODO: Do we need to implement also pure literal?
 class DPLL(object):
-    def __init__(self, cnf_forumla: CnfFormula, partial_assignment=None, watch_literals=defaultdict(set),
-                 is_first_run=True):
-        partial_assignment = partial_assignment or [{}]
-        watch_literals = watch_literals or defaultdict(set)
+    def __init__(self, cnf_forumla: CnfFormula, partial_assignment=None, watch_literals=None, implication_graph=None,
+                 implication_graph_root=None, is_first_run=True):
+        self._assignment = partial_assignment or [{}]
+        self.watch_literals = watch_literals or defaultdict(set)
+        self.implication_graph = implication_graph or {}
+        self.implication_graph_root = implication_graph_root or [0]
         self.formula = cnf_forumla
-        self.watch_literals = watch_literals
+
         if self.watch_literals == {} and self.formula:
             self.initialize_watch_literals()
 
-        self._assignment = partial_assignment
+
         # if self.formula is not None:
         #     self.formula = self.unit_propagation(self.formula)
 
@@ -52,23 +55,38 @@ class DPLL(object):
                     full_assignment[v.name] = True
         return full_assignment
 
-    def assign_true_to_literal(self, literal: Literal):
+    def assign_true_to_literal(self, literal: Literal, reason: Optional[int]):
         '''
         Assigns true to the given literal, i.e. remove all clauses that this literal is in
         And remove the negation of this literal from all clauses, if it is the only literal return None
-        :param literal:
+        :param literal: literal to assign to
+        :param reason: the clause that caused this assignment, if None the reason is decided
         :return: None if can't do this assignment, otherwise a new formula (also editing the self._formulas[-1])
         '''
-        if literal.name not in self._assignment[-1]:
-            self._assignment[-1][literal.name] = not literal.negated
+        assert literal.name not in self._assignment[-1]
+        self._assignment[-1][literal.name] = not literal.negated
+
+        # Add a node to the implication graph
+
+        level = len(self._assignment) - 1
+        if level == 0:
+            self.implication_graph[(0,0)] = []
+        if reason is None:
+
+            self.implication_graph[(literal.name, level)] = []
+            self.implication_graph_root.append(literal.name)
+            assert len(self.implication_graph_root) - 1 == level
         else:
-            raise Exception
+            root_node = (self.implication_graph_root[level], level)
+            self.implication_graph[root_node].append({(literal.name, level): reason})
 
         # We decided that lit is True (lit might be ~x_1, then x_1 is False)
         # Remove all clauses that has lit (they are satisfied), and delete ~lit from all other clauses
         removed_clauses = set(self.formula.literal_to_clauses[literal])
         if not self.formula.remove_clause(removed_clauses):
-            return None
+            # Indicate the query is SAT
+            self.formula.clauses = [[]]
+            return self.formula
 
         clause_unsatisfied = self._check_unsat(literal)
         if clause_unsatisfied is not None:
@@ -107,15 +125,16 @@ class DPLL(object):
         Perform unit propoagation on the given cnf formula (editing the formula)
         :return the formula after unit propogation
         '''
-        other_watch = None
+
         if self.formula is None:
             return None
         n_literal = copy(literal).negate()
 
         for sub_formula_idx in self.watch_literals[n_literal]:
             hope = True
+            other_watch = None
             for lit in self.formula.clauses[sub_formula_idx]:
-                if lit.variable.name not in self._assignment[-1]:
+                if lit.name not in self._assignment[-1]:
                     if sub_formula_idx in self.watch_literals[lit]:
                         other_watch = lit
                     else:
@@ -126,7 +145,7 @@ class DPLL(object):
                         break
             # only other_watch and the current assigned literal are not assigned, assign the other_watch
             if other_watch is not None and hope:
-                self.formula = self.assign_true_to_literal(other_watch)
+                self.formula = self.assign_true_to_literal(other_watch, sub_formula_idx)
             if self.formula is None:
                 return self.formula
         return self.formula
@@ -142,12 +161,12 @@ class DPLL(object):
         found = True
         while found == True:
             found = False
-            for sub_forumla in self.formula.clauses:
+            for i, sub_forumla in enumerate(self.formula.clauses):
                 if len(sub_forumla) == 1:
                     found = True
                     lit = sub_forumla[0]
                     # assert lit.name not in self._assignment
-                    self.formula = self.assign_true_to_literal(lit)
+                    self.formula = self.assign_true_to_literal(lit, reason=i)
                     if self.formula is None:
                         return self.formula
 
@@ -176,7 +195,10 @@ class DPLL(object):
         return self.formula.get_literal_appears_max(self._assignment[-1])
 
     def search(self):
-        if self.formula is None or self.formula == []:
+        # if self.formula == []:
+        #     # Forumla is UNSAT
+        #     return True
+        if self.formula is None:
             # Formula is unsat
             return False
         real_formula = [f for f in self.formula.clauses if f != []]
@@ -186,22 +208,34 @@ class DPLL(object):
             return True
 
         # current_variables = self.formula.get_variables()
-        next_decision = self.decision_heuristic()
+        # TOOD: does this heuristic make sense? we try the literal which appears the most, but if it is UNSAT we negate
+        # it and try again, the second literal might not be very helpful
+        next_decision_lit = self.decision_heuristic()
+        assert isinstance(next_decision_lit, Literal)
+        next_decision = next_decision_lit.variable
         assert isinstance(next_decision, Variable)
 
-        for d in [True, False]:
+        assignment_order = [True, False] #[False, True] if next_decision_lit.negated else [True, False]
+        for d in assignment_order:
             # current_assignment = copy(self._assignment)
-            current_assignment = self._assignment
-            current_assignment.append(copy(self._assignment[-1]))
-            dpll = DPLL(deepcopy(self.formula), watch_literals=self.watch_literals,
-                        partial_assignment=current_assignment, is_first_run=False)
-            dpll.assign_true_to_literal(Literal(next_decision, not d))
+            cur_assignment = self._assignment
+            cur_assignment.append(copy(self._assignment[-1]))
+            dpll = DPLL(deepcopy(self.formula), watch_literals=self.watch_literals, partial_assignment=cur_assignment,
+                        implication_graph=self.implication_graph, implication_graph_root=self.implication_graph_root,
+                        is_first_run=False)
+            dpll.assign_true_to_literal(Literal(next_decision, not d), reason=None)
             # formula = self.unit_propagation(formula)
 
             sat = dpll.search()
             if sat:
                 self.unsat = False
                 return sat
+
+            # clear the last decision
+            decision_level = len(self._assignment) - 1
+            # decision_literal = self.implication_graph_root[decision_level] if decision_level > 0 else 0
+            # del self.implication_graph[(decision_literal, decision_level)]
+            self.implication_graph_root.pop(decision_level)
             self._assignment.pop()
 
         return False
