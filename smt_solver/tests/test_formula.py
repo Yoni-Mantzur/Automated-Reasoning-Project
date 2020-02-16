@@ -30,7 +30,8 @@ def test_formula_from_str(debug=True):
         assert str(formula) == s
 
 def test_get_terms(debug=True):
-    for s, term_set in [['~r(r(x))=r(x)|r(x)=x', {'r(x)', 'x', 'r(r(x))'}],
+    for s, term_set in [['f(f(a,b),b)=b', {'f(f(a,b),b)', 'f(a,b)', 'b', 'a'}],
+                        ['~r(r(x))=r(x)|r(x)=x', {'r(x)', 'x', 'r(r(x))'}],
                         ['(r(x)=x|q(y)=y)', {'r(x)', 'x', 'q(y)','y'}],
                         ['plus(s(x),y,s(plus(x,y)))=x', {'plus(s(x),y,s(plus(x,y)))', 's(x)', 'y',
                                                's(plus(x,y))', 'plus(x,y)', 'x'}]]:
@@ -42,3 +43,21 @@ def test_get_terms(debug=True):
         actual_term_set = {str(term) for term in formula.terms.values()}
         assert len(actual_term_set) == len(formula.terms.values())
         assert actual_term_set == term_set
+
+def test_get_parents(debug=True):
+    for s, term_set, parents in [['f(f(a,b),b)=b', {'f(f(a,b),b)', 'f(a,b)', 'b', 'a'}, {'b' : {'f(f(a,b),b)', 'f(a,b)'},
+                                                                         'a': {'f(a,b)'},
+                                                                         'f(a,b)': {'f(f(a,b),b)'},
+                                                                         'f(f(a,b),b)': set()}]]:
+        if debug:
+            print('Parsing', s, 'as a first-order formula...')
+        formula = Formula.from_str(s)
+        if debug:
+            print('.. and got', formula)
+        actual_term_set = {str(term) for term in formula.terms.values()}
+        assert len(actual_term_set) == len(formula.terms.values())
+        assert actual_term_set == term_set
+        for term in term_set:
+            actual_parents = set(map(lambda idx_parent: str(formula.terms[idx_parent]),
+                                     formula.terms[formula.terms_to_idx[term]].parents))
+            assert parents[term] == actual_parents

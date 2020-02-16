@@ -14,8 +14,9 @@ class Term(object):
 
     def __init__(self, name):
         self.idx = next(self._ids)
+        self.next_ptr = self.idx
         self.name = name
-        self.parent = None
+        self.parents = set()
 
     def get_terms(self) -> Set['Term']:
         return set()
@@ -70,12 +71,13 @@ class PureTerm(Term):
 
 class FunctionTerm(Term):
 
-    def __init__(self, name, input_terms: List[Term]):
+    def __init__(self, name, input_terms: List[Term], create_new_one=True):
         super(FunctionTerm, self).__init__(name)
         self.input_terms = input_terms
 
-        for input_term in self.input_terms:
-            input_term.parent = self
+        if create_new_one:
+            for input_term in self.input_terms:
+                input_term.parents.add(self.idx)
 
     def get_terms(self):
         terms = set()
@@ -113,10 +115,14 @@ class FunctionTerm(Term):
             if is_function(prefix_term):
                 func_name = get_name(prefix_term)
                 args, prefix_term = extract_args(func_name, prefix_term)
-                function_term = FunctionTerm(func_name, args)
+                function_term = FunctionTerm(func_name, args, create_new_one=False)
                 if function_term in formula.terms_to_idx:
-                    return formula.terms[formula.terms_to_idx[function_term]], prefix_term[1:]
+                    f_term_ptr = formula.terms[formula.terms_to_idx[function_term]]
+                    for input_term in f_term_ptr.input_terms:
+                        input_term.parents.add(f_term_ptr.idx)
+                    return f_term_ptr, prefix_term[1:]
 
+                function_term = FunctionTerm(func_name, args)
                 formula.terms_to_idx[str(function_term)] = function_term.idx
                 formula.terms[function_term.idx] = function_term
                 return function_term, prefix_term[1:]
@@ -133,6 +139,9 @@ class FunctionTerm(Term):
         return cast(FunctionTerm, from_str_helper(term)[0])
 
     def __str__(self):
+        return self.extract_function_as_str()
+
+    def extract_function_as_str(self):
         return self.name + '({})'.format(','.join([str(term) for term in self.input_terms]))
 
     def __repr__(self):
@@ -170,6 +179,7 @@ class EquationTerm(Term):
         equation_term = EquationTerm(Term.from_str(lhs, formula), Term.from_str(rhs, formula))
         formula.equations_to_idx[str(equation_term)] = equation_term.idx
         formula.equations[equation_term.idx] = equation_term
+        formula.var_equalities_mapping[equation_term.name] = equation_term.idx
         return equation_term
 
     def __str__(self):
@@ -191,7 +201,6 @@ class Formula(object):
 
         self.var_equalities_mapping = {}  # type: Dict[str, int]
         self.var_inequalities_mapping = {}  # type: Dict[str, int]
-
 
     def __str__(self):
         def replace_vars(formula, mapping, negate):
@@ -240,16 +249,14 @@ class Formula(object):
         formula.update_mappings()
         return formula
 
-
     def update_mappings(self):
-        for idx, equation in self.equations.items():
-            if equation.negated:
-                self.var_inequalities_mapping[equation.name] = idx
-            else:
-                self.var_equalities_mapping[equation.name] = idx
+        for literal in self.sat_formula.get_literals():
+            if literal.negated:
+                self.var_inequalities_mapping[literal.name] = self.var_equalities_mapping[literal.name]
+                del self.var_equalities_mapping[literal.name]
 
-    def get_equalities(self) -> Set[Term]:
-        return set(map(lambda idx: self.equations[idx], self.var_equalities_mapping.values()))
+    def get_equalities(self) -> Set[int]:
+        return set(map(lambda idx: idx, self.var_equalities_mapping.values()))
 
-    def get_inequalities(self) -> Set[Term]:
-        return set(map(lambda idx: self.equations[idx], self.var_inequalities_mapping.values()))
+    def get_inequalities(self) -> Set[int]:
+        return set(map(lambda idx: idx, self.var_inequalities_mapping.values()))

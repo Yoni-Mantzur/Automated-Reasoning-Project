@@ -1,7 +1,7 @@
 import re
 
 from itertools import count
-from typing import Optional
+from typing import Optional, List
 
 from sat_solver.patterns import variable_pattern, unary_formula_pattern, binary_formula_pattern
 
@@ -72,6 +72,20 @@ class SatFormula(object):
         self.is_leaf = is_leaf
 
         self.idx = next(self._ids)
+
+    def get_literals(self) -> List[Literal]:
+        if self.is_leaf:
+            return [self.value]
+
+        literals = []
+        if self.left:
+            literals += self.left.get_literals()
+
+        if self.right:
+            literals += self.right.get_literals()
+
+        return literals
+
 
     def __str__(self):
         # Variable
