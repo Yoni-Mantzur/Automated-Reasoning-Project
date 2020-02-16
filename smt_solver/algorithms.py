@@ -22,7 +22,7 @@ def congruence_closure_algorithm(terms: Dict[int, Term],
         t2_rep = find_representative(t2)
 
         if t1_rep == t2_rep:
-            return
+            return False
 
         # merge parents
         t2_rep.parents |= t1_rep.parents
@@ -30,6 +30,7 @@ def congruence_closure_algorithm(terms: Dict[int, Term],
 
         # Change representative ptr
         t1_rep.next_ptr = t2_rep.idx
+        return True
 
 
     def process(t1, t2):
@@ -39,12 +40,12 @@ def congruence_closure_algorithm(terms: Dict[int, Term],
         parents_pairs = set(product(t1_rep.parents, t2_rep.parents))
 
         # merge classes
-        merge(t1, t2)
+        if not merge(t1, t2):
+           return
 
         # merge parents
         for p1, p2 in map(lambda p: (terms[p[0]], terms[p[1]]), parents_pairs):
-            if p1.eq_class != p2.eq_class:
-                process(p1, p2)
+            process(p1, p2)
 
 
     def is_legal_sets():
@@ -65,7 +66,7 @@ def congruence_closure_algorithm(terms: Dict[int, Term],
 def satisfied(formula: Formula) -> bool:
     terms = formula.terms
     equations = formula.equations
-    equalities = formula.get_equalities()
-    inequalities = formula.get_inequalities()
+    equalities = formula.equalities_set
+    inequalities = formula.inequalities_set
 
     return congruence_closure_algorithm(terms, equations, equalities, inequalities)

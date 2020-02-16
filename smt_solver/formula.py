@@ -179,7 +179,7 @@ class EquationTerm(Term):
         equation_term = EquationTerm(Term.from_str(lhs, formula), Term.from_str(rhs, formula))
         formula.equations_to_idx[str(equation_term)] = equation_term.idx
         formula.equations[equation_term.idx] = equation_term
-        formula.var_equalities_mapping[equation_term.name] = equation_term.idx
+        formula.var_equation_mapping[equation_term.name] = equation_term.idx
         return equation_term
 
     def __str__(self):
@@ -199,19 +199,15 @@ class Formula(object):
         self.terms = {}  # type: Dict[int, Term]
         self.terms_to_idx = {}  # type: Dict[str, int]
 
-        self.var_equalities_mapping = {}  # type: Dict[str, int]
-        self.var_inequalities_mapping = {}  # type: Dict[str, int]
+        self.var_equation_mapping = {}  # type: Dict[str, int]
+        self.equalities_set = set()  # type: Set[int]
+        self.inequalities_set = set()  # type: Set[int]
 
     def __str__(self):
-        def replace_vars(formula, mapping, negate):
-            for var, equation_idx in mapping.items():
-                formula = formula.replace('%s%s' %(negate, var), str(self.equations[equation_idx]))
-            return formula
-
         formula = str(self.sat_formula)
-        formula = replace_vars(formula, self.var_equalities_mapping, negate='')
-        formula = replace_vars(formula, self.var_inequalities_mapping, negate='~')
-
+        for var, equation_idx in self.var_equation_mapping.items():
+            negate = '~' if self.equations[equation_idx].negated else ''
+            formula = formula.replace('%s%s' % (negate, var), str(self.equations[equation_idx]))
         return formula
 
     def __repr__(self):
@@ -246,17 +242,18 @@ class Formula(object):
 
         formula = Formula()
         formula.sat_formula = from_str_helper(raw_formula)
-        formula.update_mappings()
+        formula.update_mappings({literal.name: literal.negated for literal in
+                                 formula.sat_formula.get_literals()})
         return formula
 
-    def update_mappings(self):
-        for literal in self.sat_formula.get_literals():
-            if literal.negated:
-                self.var_inequalities_mapping[literal.name] = self.var_equalities_mapping[literal.name]
-                del self.var_equalities_mapping[literal.name]
+    def update_mappings(self, partial_assignment: Dict[str, bool]):
+        self.equalities_set = set()
+        self.inequalities_set = set()
+        for var_name, is_negated in partial_assignment.items():
+            equation_idx = self.var_equation_mapping[var_name]
+            is_negated |= self.equations[equation_idx].negated
+            if is_negated:
+                self.inequalities_set.add(equation_idx)
+            else:
+                self.equalities_set.add(equation_idx)
 
-    def get_equalities(self) -> Set[int]:
-        return set(map(lambda idx: idx, self.var_equalities_mapping.values()))
-
-    def get_inequalities(self) -> Set[int]:
-        return set(map(lambda idx: idx, self.var_inequalities_mapping.values()))
