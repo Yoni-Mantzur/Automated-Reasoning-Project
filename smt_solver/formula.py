@@ -1,9 +1,10 @@
 import re
 from abc import abstractmethod
 from itertools import count
-from typing import List, Dict, Optional, Tuple, cast
+from typing import List, Dict, Optional, Tuple, cast, Set, Union
 
 from common.operator import Operator
+from sat_solver.cnf_formula import CnfFormula
 from sat_solver.sat_formula import SatFormula
 from smt_solver.patterns import *
 
@@ -14,26 +15,32 @@ class Term(object):
     def __init__(self, name):
         self.idx = next(self._ids)
         self.name = name
+        self.parent = None
 
-    def get_terms(self):
-        return []
+    def get_terms(self) -> Set['Term']:
+        return set()
 
-    def get_functions(self):
-        return []
+    def get_functions(self) -> Set['Term']:
+        return set()
 
     @staticmethod
-    def from_str(term: str) -> 'Term':
+    def from_str(term: str, formula) -> 'Term':
         m = re.match(term_pattern, term)
         assert m
 
         if m.group('function'):
-            return FunctionTerm.from_str(term)
+            return FunctionTerm.from_str(term, formula)
 
         if m.group('variable'):
-            return PureTerm.from_str(term)
+            return PureTerm.from_str(term, formula)
 
         raise Exception('Not a term string')
 
+    def __eq__(self, other):
+        return str(self) == str(other)
+
+    def __hash__(self):
+        return hash(str(self))
 
 class PureTerm(Term):
 
@@ -42,11 +49,17 @@ class PureTerm(Term):
         self.name = name
 
     def get_terms(self):
-        return [self]
+        return {self}
 
     @staticmethod
-    def from_str(term: str) -> 'Term':
-        return PureTerm(term)
+    def from_str(term: str, formula) -> 'Term':
+        if term in formula.terms_to_idx:
+            return formula.terms[formula.terms_to_idx[term]]
+
+        pure_term = PureTerm(term)
+        formula.terms_to_idx[term] = pure_term.idx
+        formula.terms[pure_term.idx] = pure_term
+        return pure_term
 
     def __str__(self):
         return self.name
@@ -61,20 +74,23 @@ class FunctionTerm(Term):
         super(FunctionTerm, self).__init__(name)
         self.input_terms = input_terms
 
-    def get_terms(self):
-        terms = []
         for input_term in self.input_terms:
-            terms.append(input_term.get_terms())
+            input_term.parent = self
+
+    def get_terms(self):
+        terms = set()
+        for input_term in self.input_terms:
+            terms.update(input_term.get_terms())
         return terms
 
     def get_functions(self):
-        functions = [self]
+        functions = {self}
         for input_term in self.input_terms:
-            functions.append(input_term.get_functions())
+            functions.update(input_term.get_functions())
         return functions
 
     @staticmethod
-    def from_str(term: str) -> 'FunctionTerm':
+    def from_str(term: str, formula) -> 'FunctionTerm':
         def is_function(t: str) -> bool:
             match = re.search(function_pattern, t)
             return match and match.start() == 0
@@ -97,10 +113,22 @@ class FunctionTerm(Term):
             if is_function(prefix_term):
                 func_name = get_name(prefix_term)
                 args, prefix_term = extract_args(func_name, prefix_term)
-                return FunctionTerm(func_name, args), prefix_term[1:]
+                function_term = FunctionTerm(func_name, args)
+                if function_term in formula.terms_to_idx:
+                    return formula.terms[formula.terms_to_idx[function_term]], prefix_term[1:]
+
+                formula.terms_to_idx[str(function_term)] = function_term.idx
+                formula.terms[function_term.idx] = function_term
+                return function_term, prefix_term[1:]
 
             var_name = get_name(prefix_term)
-            return PureTerm(var_name), prefix_term[len(var_name):]
+            if var_name in formula.terms_to_idx:
+                return formula.terms[formula.terms_to_idx[var_name]], prefix_term[len(var_name):]
+
+            variable = PureTerm(var_name)
+            formula.terms_to_idx[var_name] = variable.idx
+            formula.terms[variable.idx] = variable
+            return variable, prefix_term[len(var_name):]
 
         return cast(FunctionTerm, from_str_helper(term)[0])
 
@@ -112,27 +140,37 @@ class FunctionTerm(Term):
 
 
 class EquationTerm(Term):
-
     def __init__(self, lhs: Term, rhs: Term):
         super(EquationTerm, self).__init__('')
         self.name = 'v%d' % self.idx
         self.lhs = lhs
         self.rhs = rhs
+        self.negated = False
 
     def get_terms(self):
-        return self.lhs.get_terms() + self.rhs.get_terms()
+        terms = self.lhs.get_terms()
+        terms.update(self.rhs.get_terms())
+        return terms
 
     def get_functions(self):
-        return self.lhs.get_functions() + self.rhs.get_functions()
+        functions = self.lhs.get_functions()
+        functions.update(self.rhs.get_functions())
+        return functions
 
     @staticmethod
-    def from_str(term: str) -> Term:
+    def from_str(term: str, formula) -> Term:
+        if term in formula.equations_to_idx:
+            return formula.equations[formula.equations_to_idx[term]]
+
         m = re.match(equation_pattern, term)
         assert m;
         lhs = m.group('lhs')
         rhs = m.group('rhs')
 
-        return EquationTerm(Term.from_str(lhs), Term.from_str(rhs))
+        equation_term = EquationTerm(Term.from_str(lhs, formula), Term.from_str(rhs, formula))
+        formula.equations_to_idx[str(equation_term)] = equation_term.idx
+        formula.equations[equation_term.idx] = equation_term
+        return equation_term
 
     def __str__(self):
         return '{}={}'.format(str(self.lhs), str(self.rhs))
@@ -142,24 +180,33 @@ class EquationTerm(Term):
 
 
 class Formula(object):
-    def __init__(self,
-                 sat_formula: Optional[SatFormula] = None,
-                 var_to_equation_mapping: Optional[Dict[str, EquationTerm]] = None):
+    def __init__(self):
+        self.sat_formula = None  # type: Optional[Union[SatFormula, CnfFormula]]
 
-        self.var_equation_mapping = var_to_equation_mapping or dict()
-        self.sat_formula = sat_formula
-        self.terms = []  # type: List[PureTerm]
-        self.functions = []  # type: List[EquationTerm]
+        self.equations = {}  # type: Dict[int, EquationTerm]
+        self.equations_to_idx = {}  # type: Dict[str, int]
+
+        self.terms = {}  # type: Dict[int, Term]
+        self.terms_to_idx = {}  # type: Dict[str, int]
+
+        self.var_equalities_mapping = {}  # type: Dict[str, int]
+        self.var_inequalities_mapping = {}  # type: Dict[str, int]
+
 
     def __str__(self):
+        def replace_vars(formula, mapping, negate):
+            for var, equation_idx in mapping.items():
+                formula = formula.replace('%s%s' %(negate, var), str(self.equations[equation_idx]))
+            return formula
+
         formula = str(self.sat_formula)
-        for var, equation in self.var_equation_mapping.items():
-            formula = formula.replace(var, str(equation))
+        formula = replace_vars(formula, self.var_equalities_mapping, negate='')
+        formula = replace_vars(formula, self.var_inequalities_mapping, negate='~')
+
         return formula
 
     def __repr__(self):
-        return 'Formula(functions: %s\n equations: %s\n terms: %s\n encoded formula: %s' % \
-               (str(self.functions), str(self.var_equation_mapping.values()), str(self.terms), str(self.sat_formula))
+        return 'Formula(%s)' % str(self)
 
     @staticmethod
     def from_str(raw_formula: str) -> 'Formula':
@@ -171,43 +218,38 @@ class Formula(object):
             m_binary = re.match(binary_formula_pattern, raw_formula)
 
             if not m_unary and not m_binary:
-                equation = EquationTerm.from_str(raw_formula)
-                formula.var_equation_mapping[equation.name] = equation
+                equation = EquationTerm.from_str(raw_formula, formula)
                 return SatFormula.create_leaf(equation.name)
 
+            left, right = None, None
             if m_binary:
                 op = Operator(m_binary.group('op'))
-                left, right = m_binary.group('left'), m_binary.group('right')
+                left = from_str_helper(m_binary.group('left'))
+                right = from_str_helper(m_binary.group('right'))
 
             else:
                 op = Operator(m_unary.group('op'))
-                left, right = m_unary.group('left'), None
+                left = from_str_helper(m_unary.group('left'))
+                if left.is_leaf:
+                    left.value.negate()
 
-            left = from_str_helper(left)
-            right = from_str_helper(right)
             return SatFormula(left, right, op)
 
         formula = Formula()
         formula.sat_formula = from_str_helper(raw_formula)
-        formula.get_terms(update=True)
-        formula.get_functions(update=True)
+        formula.update_mappings()
         return formula
 
-    def get_terms(self, update=False) -> List[Term]:
-        if update or not self.terms:
-            self.terms = []
-            for equation in self.var_equation_mapping.values():
-                self.terms += equation.get_terms()
 
-        return self.terms
+    def update_mappings(self):
+        for idx, equation in self.equations.items():
+            if equation.negated:
+                self.var_inequalities_mapping[equation.name] = idx
+            else:
+                self.var_equalities_mapping[equation.name] = idx
 
-    def get_functions(self, update=False) -> List[Term]:
-        if update or not self.terms:
-            self.functions = []
-            for equation in self.var_equation_mapping.values():
-                self.terms += equation.get_functions()
+    def get_equalities(self) -> Set[Term]:
+        return set(map(lambda idx: self.equations[idx], self.var_equalities_mapping.values()))
 
-        return self.functions
-
-    def get_equations(self) -> List[Term]:
-        return list(self.var_equation_mapping.values())
+    def get_inequalities(self) -> Set[Term]:
+        return set(map(lambda idx: self.equations[idx], self.var_inequalities_mapping.values()))

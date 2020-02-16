@@ -12,14 +12,14 @@ def test_term_from_str(debug=True):
     for s in ['f(a1,g(x1))', 'a12', 's(s(s(a1)))', 'plus(x1,s(y1))']:
         if debug:
             print('Parsing', s, 'as a Term...')
-        term = Term.from_str(s)
+        term = Term.from_str(s, Formula())
         if debug:
             print('... and got', term)
         assert str(term) == s
 
 
 def test_formula_from_str(debug=True):
-    for s in ['~r(r(x))=x', 'a=a', '(r(x)=x|q(y)=y)', '(a=a&x=x)', '((r(x)=x&x=a)|q(x)=a)',
+    for s in ['~r(r(x))=x', '(a=a|a=a)', '(r(x)=x|q(y)=y)', '(a=a&x=x)', '((r(x)=x&x=a)|q(x)=a)',
               'r(r(x),y)=x', 'plus(s(x),y,s(plus(x,y)))=x', 'r(x8,x7,c)=a',
               'r(x,y)=x', '~~~q(x)=x']:
         if debug:
@@ -28,3 +28,17 @@ def test_formula_from_str(debug=True):
         if debug:
             print('.. and got', formula)
         assert str(formula) == s
+
+def test_get_terms(debug=True):
+    for s, term_set in [['~r(r(x))=r(x)|r(x)=x', {'r(x)', 'x', 'r(r(x))'}],
+                        ['(r(x)=x|q(y)=y)', {'r(x)', 'x', 'q(y)','y'}],
+                        ['plus(s(x),y,s(plus(x,y)))=x', {'plus(s(x),y,s(plus(x,y)))', 's(x)', 'y',
+                                               's(plus(x,y))', 'plus(x,y)', 'x'}]]:
+        if debug:
+            print('Parsing', s, 'as a first-order formula...')
+        formula = Formula.from_str(s)
+        if debug:
+            print('.. and got', formula)
+        actual_term_set = {str(term) for term in formula.terms.values()}
+        assert len(actual_term_set) == len(formula.terms.values())
+        assert actual_term_set == term_set
