@@ -61,3 +61,23 @@ def test_get_parents(debug=True):
             actual_parents = set(map(lambda idx_parent: str(formula.terms[idx_parent]),
                                      formula.terms[formula.terms_to_idx[term]].parents))
             assert parents[term] == actual_parents
+
+
+def test_satisfied(debug=True):
+    for s, is_sat in [('(f(a,b)=a&~f(f(a,b),b)=a)', False),
+                      ('(f(x)=f(y)&~x=y)', True),
+                      ('((f(f(f(a)))=a&f(f(f(f(f(a)))))=a)&f(a)=a)', True)]:
+        if debug:
+            print('Parsing', s, 'as a first-order formula...')
+    formula = Formula.from_str(s)
+    if debug:
+        print('.. and got', formula)
+    assert formula.satisfied() == is_sat
+
+
+def test_propagation(debug=True):
+    pass
+
+
+def test_conflict(debug=True):
+    pass

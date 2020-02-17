@@ -21,7 +21,6 @@ class DPLL(object):
         if self.watch_literals == {} and self.formula:
             self.initialize_watch_literals()
 
-
         # if self.formula is not None:
         #     self.formula = self.unit_propagation(self.formula)
 
@@ -76,7 +75,6 @@ class DPLL(object):
         else:
             self.implication_graph.add_node(level, literal.variable, self.formula.clauses[reason], reason)
 
-
         # We decided that lit is True (lit might be ~x_1, then x_1 is False)
         # Remove all clauses that has lit (they are satisfied), and delete ~lit from all other clauses
         removed_clauses = set(self.formula.literal_to_clauses[literal])
@@ -105,7 +103,6 @@ class DPLL(object):
         # TODO: Return the literal from the node
         uip_literal = [l for l in clause if l.variable == uip_node.variable][0]
         raise NotImplementedError
-
 
     def _check_unsat(self, literal: Literal):
         '''
@@ -212,7 +209,9 @@ class DPLL(object):
         '''
         return self.formula.get_literal_appears_max(self._assignment[-1])
 
-    def search(self, propegate_helper: Optional[Callable[[Dict[str, bool]], None]] = None) -> bool:
+    def search(self, propegate_helper: Optional[Callable[[Dict[str, bool]], bool]] = None,
+               conflict_helper: Optional[Callable[[Dict[str, bool]], List[str]]] = None) -> bool:
+
         # if self.formula == []:
         #     # Forumla is UNSAT
         #     return True

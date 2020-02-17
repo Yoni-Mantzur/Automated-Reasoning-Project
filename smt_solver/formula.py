@@ -3,9 +3,9 @@ from itertools import count
 from typing import List, Dict, Optional, Tuple, cast, Set
 
 from common.operator import Operator
+from sat_solver.DPLL import DPLL
 from sat_solver.cnf_formula import CnfFormula
 from sat_solver.sat_formula import SatFormula
-from smt_solver.algorithms import congruence_closure_algorithm
 from smt_solver.patterns import *
 
 
@@ -72,11 +72,11 @@ class PureTerm(Term):
 
 class FunctionTerm(Term):
 
-    def __init__(self, name, input_terms: List[Term], create_new_one=True):
+    def __init__(self, name, input_terms: List[Term], add_parent=True):
         super(FunctionTerm, self).__init__(name)
         self.input_terms = input_terms
 
-        if create_new_one:
+        if add_parent:
             for input_term in self.input_terms:
                 input_term.parents.add(self.idx)
 
@@ -116,26 +116,32 @@ class FunctionTerm(Term):
             if is_function(prefix_term):
                 func_name = get_name(prefix_term)
                 args, prefix_term = extract_args(func_name, prefix_term)
-                function_term = FunctionTerm(func_name, args, create_new_one=False)
+                function_term = FunctionTerm(func_name, args, add_parent=False)
+
+                # Function already exits
                 if function_term in formula.terms_to_idx:
                     f_term_ptr = formula.terms[formula.terms_to_idx[function_term]]
+                    # Update parents
                     for input_term in f_term_ptr.input_terms:
                         input_term.parents.add(f_term_ptr.idx)
-                    return f_term_ptr, prefix_term[1:]
+                    term = f_term_ptr
+                else:
+                    term = FunctionTerm(func_name, args)
+                prefix_term = prefix_term[1:]
 
-                function_term = FunctionTerm(func_name, args)
-                formula.terms_to_idx[str(function_term)] = function_term.idx
-                formula.terms[function_term.idx] = function_term
-                return function_term, prefix_term[1:]
+            else:
+                var_name = get_name(prefix_term)
+                # variable already exits
+                if var_name in formula.terms_to_idx:
+                    return formula.terms[formula.terms_to_idx[var_name]], prefix_term[len(var_name):]
 
-            var_name = get_name(prefix_term)
-            if var_name in formula.terms_to_idx:
-                return formula.terms[formula.terms_to_idx[var_name]], prefix_term[len(var_name):]
+                term, prefix_term = PureTerm(var_name), prefix_term[len(var_name):]
 
-            variable = PureTerm(var_name)
-            formula.terms_to_idx[var_name] = variable.idx
-            formula.terms[variable.idx] = variable
-            return variable, prefix_term[len(var_name):]
+            # Update term mapping
+            formula.terms_to_idx[str(term)] = term.idx
+            formula.terms[term.idx] = term
+
+            return term, prefix_term
 
         return cast(FunctionTerm, from_str_helper(term)[0])
 
@@ -178,9 +184,13 @@ class EquationTerm(Term):
         rhs = m.group('rhs')
 
         equation_term = EquationTerm(Term.from_str(lhs, formula), Term.from_str(rhs, formula))
+
+        # If equation exists will override it, and that is ok
+        # Update equations mappings
         formula.equations_to_idx[str(equation_term)] = equation_term.idx
         formula.equations[equation_term.idx] = equation_term
         formula.var_equation_mapping[equation_term.name] = equation_term.idx
+
         return equation_term
 
     def __str__(self):
@@ -193,7 +203,6 @@ class EquationTerm(Term):
 class Formula(object):
     def __init__(self):
         self.sat_formula = None  # type: Optional[SatFormula]
-        self._cnfFormula = None  # Optional[CnfFormula]
         self.conflicts = set()
 
         self.equations = {}  # type: Dict[int, EquationTerm]
@@ -203,8 +212,8 @@ class Formula(object):
         self.terms_to_idx = {}  # type: Dict[str, int]
 
         self.var_equation_mapping = {}  # type: Dict[str, int]
-        self.equalities_set = set()  # type: Set[int]
-        self.inequalities_set = set()  # type: Set[int]
+        self.equalities = set()  # type: Set[int]
+        self.inequalities = set()  # type: Set[int]
 
     def __str__(self):
         formula = str(self.sat_formula)
@@ -250,35 +259,57 @@ class Formula(object):
         return formula
 
     def update_mappings(self, partial_assignment: Dict[str, bool]):
-        self.equalities_set = set()
-        self.inequalities_set = set()
+        self.equalities = set()
+        self.inequalities = set()
         for var_name, is_negated in partial_assignment.items():
             equation_idx = self.var_equation_mapping[var_name]
             is_negated |= self.equations[equation_idx].negated
             if is_negated:
-                self.inequalities_set.add(equation_idx)
+                self.inequalities.add(equation_idx)
             else:
-                self.equalities_set.add(equation_idx)
+                self.equalities.add(equation_idx)
 
     def satisfied(self) -> bool:
-        return congruence_closure_algorithm(self.terms, self.equations, self.equalities_set, self.inequalities_set)
+        from smt_solver.algorithms import CongruenceClosureAlgorithm
+        return CongruenceClosureAlgorithm(self).is_legal_sets()
 
-    def conflict(self, partial_assignment: Dict[str, bool]):
+    def conflict(self, partial_assignment: Dict[str, bool]) -> List[str]:
         conflict = []
         for var, value in partial_assignment.items():
             negated = '' if value else Operator.NEGATION.value
             conflict.append(negated + var)
 
         self.conflicts.add(conflict)
+        return conflict
 
-    def propagate(self, partial_assignment: Dict[str, bool]) -> None:
+    def propagate(self, partial_assignment: Dict[str, bool]) -> bool:
+        from smt_solver.algorithms import CongruenceClosureAlgorithm
+
         self.update_mappings(partial_assignment)
+        classes_algorithm = CongruenceClosureAlgorithm(self)
 
-    @property
-    def cnf_formula(self) -> CnfFormula:
-        if self.conflicts:
-            self._cnfFormula = CnfFormula.from_str(str(self.sat_formula))
-            for conflict_clause in self.conflicts:
-                self._cnfFormula.add_clause(conflict_clause)
+        if not classes_algorithm.is_legal_sets():
+            return False
 
-        return self._cnfFormula
+        unassigned_var_to_equations = filter(lambda v, _: v in partial_assignment, self.var_equation_mapping.items())
+        for var, equation in unassigned_var_to_equations:
+            if classes_algorithm.is_equation_is_true(equation):
+                # Learn equality to be true and inequality to be false
+                # TODO: verify with yuval that assignment can be by var name
+                partial_assignment[var] = self.equations[equation].negated
+
+    def solve(self) -> bool:
+        cnf_formula = CnfFormula.from_str(str(self.sat_formula))
+        dpll_algorithm = DPLL(cnf_formula)
+
+        # Solve sat formula
+        is_sat, partial_assignment = dpll_algorithm.search(self.propagate, self.conflict)
+
+        # Sat formula is unsat hence, smt formula is ussat
+        if not is_sat:
+            return False
+
+        # Sat formula is sat hence need to check smt formula
+        self.update_mappings(partial_assignment)
+        if self.satisfied():
+            return True
