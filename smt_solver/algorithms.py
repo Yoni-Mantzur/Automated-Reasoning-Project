@@ -1,13 +1,15 @@
-from itertools import count, product
-from typing import List, Set, cast, Dict
+from itertools import product
+from typing import Set, Dict
 
+from sat_solver.DPLL import DPLL
+from sat_solver.cnf_formula import CnfFormula
 from smt_solver.formula import Formula, Term, EquationTerm
+
 
 def congruence_closure_algorithm(terms: Dict[int, Term],
                                  equations: Dict[int, EquationTerm],
                                  equalities: Set[int],
                                  inequalities: Set[int]) -> bool:
-
     def find_representative(t: Term) -> Term:
         next_ptr = t.next_ptr
         t = terms[next_ptr]
@@ -32,7 +34,6 @@ def congruence_closure_algorithm(terms: Dict[int, Term],
         t1_rep.next_ptr = t2_rep.idx
         return True
 
-
     def process(t1, t2):
         # find parents
         t1_rep = find_representative(t1)
@@ -41,12 +42,11 @@ def congruence_closure_algorithm(terms: Dict[int, Term],
 
         # merge classes
         if not merge(t1, t2):
-           return
+            return
 
         # merge parents
         for p1, p2 in map(lambda p: (terms[p[0]], terms[p[1]]), parents_pairs):
             process(p1, p2)
-
 
     def is_legal_sets():
         for inequality in inequalities:
@@ -63,10 +63,22 @@ def congruence_closure_algorithm(terms: Dict[int, Term],
     return is_legal_sets()
 
 
-def satisfied(formula: Formula) -> bool:
-    terms = formula.terms
-    equations = formula.equations
-    equalities = formula.equalities_set
-    inequalities = formula.inequalities_set
+def solve(formula: str) -> bool:
+    formula = Formula.from_str(formula)
 
-    return congruence_closure_algorithm(terms, equations, equalities, inequalities)
+    while True:
+        # Solve sat formula
+        dpll_algorithm = DPLL(formula.cnf_formula)
+        is_sat, partial_assignment = dpll_algorithm.search(formula.propagate)
+
+        # Sat formula is unsat hence, smt formula is ussat
+        if not is_sat:
+            return False
+
+        # Sat formula is sat hence need to check smt formula
+        formula.update_mappings(partial_assignment)
+        if formula.satisfied():
+            return True
+
+        # Smt formula is unsat, add conflict
+        formula.conflict(partial_assignment)

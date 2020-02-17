@@ -1,11 +1,11 @@
 import re
-from abc import abstractmethod
 from itertools import count
-from typing import List, Dict, Optional, Tuple, cast, Set, Union
+from typing import List, Dict, Optional, Tuple, cast, Set
 
 from common.operator import Operator
 from sat_solver.cnf_formula import CnfFormula
 from sat_solver.sat_formula import SatFormula
+from smt_solver.algorithms import congruence_closure_algorithm
 from smt_solver.patterns import *
 
 
@@ -42,6 +42,7 @@ class Term(object):
 
     def __hash__(self):
         return hash(str(self))
+
 
 class PureTerm(Term):
 
@@ -191,7 +192,9 @@ class EquationTerm(Term):
 
 class Formula(object):
     def __init__(self):
-        self.sat_formula = None  # type: Optional[Union[SatFormula, CnfFormula]]
+        self.sat_formula = None  # type: Optional[SatFormula]
+        self._cnfFormula = None  # Optional[CnfFormula]
+        self.conflicts = set()
 
         self.equations = {}  # type: Dict[int, EquationTerm]
         self.equations_to_idx = {}  # type: Dict[str, int]
@@ -257,3 +260,25 @@ class Formula(object):
             else:
                 self.equalities_set.add(equation_idx)
 
+    def satisfied(self) -> bool:
+        return congruence_closure_algorithm(self.terms, self.equations, self.equalities_set, self.inequalities_set)
+
+    def conflict(self, partial_assignment: Dict[str, bool]):
+        conflict = []
+        for var, value in partial_assignment.items():
+            negated = '' if value else Operator.NEGATION.value
+            conflict.append(negated + var)
+
+        self.conflicts.add(conflict)
+
+    def propagate(self, partial_assignment: Dict[str, bool]) -> None:
+        self.update_mappings(partial_assignment)
+
+    @property
+    def cnf_formula(self) -> CnfFormula:
+        if self.conflicts:
+            self._cnfFormula = CnfFormula.from_str(str(self.sat_formula))
+            for conflict_clause in self.conflicts:
+                self._cnfFormula.add_clause(conflict_clause)
+
+        return self._cnfFormula

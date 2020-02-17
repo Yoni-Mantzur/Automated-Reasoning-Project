@@ -110,6 +110,16 @@ class CnfFormula(object):
 
     def add_clause(self, literals):
         # TODO: when using this dont forget to update the watch_literals
+        if literals and isinstance(literals[0], str):
+            # parse literals to clause
+            new_literals = []
+            for literal in literals:
+                negated = True if literal[0] == Operator.NEGATION else False
+                literal = literal[1:] if negated else literal
+                new_literals.append(Literal.from_name(literal, negated))
+
+            literals = list(new_literals)
+
         self.clauses += literals
         for lit in literals:
             self.literal_to_clauses[lit].update(len(self.clauses))

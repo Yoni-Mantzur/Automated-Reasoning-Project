@@ -1,7 +1,7 @@
 from collections import defaultdict
 from copy import copy, deepcopy
 from random import randint
-from typing import Optional, List
+from typing import Optional, List, Dict, Callable
 
 from sat_solver.ImplicationGraph import ImplicationGraph
 from sat_solver.cnf_formula import CnfFormula
@@ -212,7 +212,7 @@ class DPLL(object):
         '''
         return self.formula.get_literal_appears_max(self._assignment[-1])
 
-    def search(self):
+    def search(self, propegate_helper: Optional[Callable[[Dict[str, bool]], None]] = None) -> bool:
         # if self.formula == []:
         #     # Forumla is UNSAT
         #     return True
@@ -243,6 +243,7 @@ class DPLL(object):
                         is_first_run=False)
             dpll.assign_true_to_literal(Literal(next_decision, not d), reason=None)
             # formula = self.unit_propagation(formula)
+            # TODO: use propagate_helper to update your current assignment (it's callable from smt solver)
 
             sat = dpll.search()
             if sat:
