@@ -12,8 +12,8 @@ from sat_solver.sat_formula import Literal, Variable
 class DPLL(object):
     def __init__(self, cnf_formula: CnfFormula, partial_assignment=None, watch_literals=None, implication_graph=None,
                  is_first_run=True,
-                 propagate_helper: Optional[Callable[[Variable, bool], bool]] = None,
-                 conflict_helper:  Optional[Callable[[Dict[Variable, bool]], List[str]]] = None):
+                 propagate_helper: Callable[[Dict[Variable, bool]], bool] = None,
+                 conflict_helper:  Callable[[Dict[Variable, bool]], List[Literal]] = None):
         self._assignment = partial_assignment or [{}]
         self.watch_literals = watch_literals or defaultdict(list)
         self.implication_graph = implication_graph or ImplicationGraph(cnf_formula)  # implication_graph or {}

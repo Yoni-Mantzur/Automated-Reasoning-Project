@@ -65,10 +65,10 @@ class SatFormula(object):
     _ids = count(-1)
 
     def __init__(self,
-                 left: Optional['SatFormula'] = None,
-                 right: Optional['SatFormula'] = None,
-                 operator: Optional[Operator] = None,
-                 is_leaf: bool = False):
+                 left: 'SatFormula'=None,
+                 right: 'SatFormula'=None,
+                 operator: Operator=None,
+                 is_leaf: bool=False):
         self.operator = operator
         self.left = left
         self.right = right
@@ -89,11 +89,10 @@ class SatFormula(object):
 
         return literals
 
-
     def __str__(self):
         # Variable
         if self.is_leaf:
-            return self.value.name
+            return str(self.value)
 
         # Binary case
         if self.right:
@@ -103,9 +102,12 @@ class SatFormula(object):
         return '{}{}'.format(self.operator.value, self.left)
 
     @staticmethod
-    def create_leaf(variable_name: str) -> 'SatFormula':
+    def create_leaf(variable_name: str, variable=None) -> 'SatFormula':
         formula = SatFormula(is_leaf=True)
-        variable = Literal.from_name(variable_name, negated=False)
+        if variable:
+            variable = Literal(variable, negated=False)
+        else:
+            variable = Literal.from_name(variable_name, negated=False)
         formula.__setattr__('value', variable)
         return formula
 
