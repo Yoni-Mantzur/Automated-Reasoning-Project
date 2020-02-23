@@ -33,6 +33,9 @@ class Literal(object):
     def __hash__(self):
         return hash(self.name) + hash(self.idx) + hash(self.negated)
 
+    def __lt__(self, other):
+        return self.idx < other.idx if self.idx != other.idx else self.negated < other.negated
+
     def negate(self):
         self.negated = not self.negated
         return self

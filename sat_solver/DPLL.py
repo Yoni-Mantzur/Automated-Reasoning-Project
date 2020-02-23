@@ -11,12 +11,16 @@ from sat_solver.sat_formula import Literal, Variable
 # TODO: Do we need to implement also pure literal?
 class DPLL(object):
     def __init__(self, cnf_forumla: CnfFormula, partial_assignment=None, watch_literals=None, implication_graph=None,
-                 implication_graph_root=None, is_first_run=True):
+                 is_first_run=True, propagate_helper: Optional[Callable[[
+                                                                            [Variable, bool]], bool]] = None,
+                 conflict_helper: Optional[Callable[[Dict[Variable, bool]], List[str]]] = None):
         self._assignment = partial_assignment or [{}]
         self.watch_literals = watch_literals or defaultdict(list)
         self.implication_graph = implication_graph or ImplicationGraph(cnf_forumla)  # implication_graph or {}
-        # self.implication_graph_root = imnplication_graph_root or [0]
+
         self.formula = cnf_forumla
+        self.conflict_helper = conflict_helper
+        self.propgate_helper = propagate_helper
 
         if self.watch_literals == {} and self.formula:
             self.initialize_watch_literals()
@@ -44,7 +48,7 @@ class DPLL(object):
             self.watch_literals[clause[first_lit]].append(i)
             self.watch_literals[clause[second_lit]].append(i)
 
-    def get_full_assignment(self):
+    def get_full_assignment(self) -> Dict[Variable, bool]:
         # if self.unsat is None or self.unsat is True:
         #     # You should first run search
         #     return None
@@ -54,6 +58,10 @@ class DPLL(object):
                 if v.name not in full_assignment:
                     full_assignment[v.name] = True
         return full_assignment
+
+    def get_partial_assignment(self) -> Dict[Variable, bool]:
+        return self._assignment[-1]
+
 
     def assign_true_to_literal(self, literal: Literal, reason: Optional[int]):
         '''
@@ -71,9 +79,9 @@ class DPLL(object):
         level = len(self._assignment) - 1
 
         if reason is None:
-            self.implication_graph.add_decide_node(level, literal.variable)
+            self.implication_graph.add_decide_node(level, literal)
         else:
-            self.implication_graph.add_node(level, literal.variable, self.formula.clauses[reason], reason)
+            self.implication_graph.add_node(level, literal, self.formula.clauses[reason], reason)
 
         # We decided that lit is True (lit might be ~x_1, then x_1 is False)
         # Remove all clauses that has lit (they are satisfied), and delete ~lit from all other clauses
@@ -85,24 +93,19 @@ class DPLL(object):
 
         clause_unsatisfied = self._check_unsat(literal)
         if clause_unsatisfied is not None:
-            self.implication_graph.learn_conflict(clause_unsatisfied)
+            # self.implication_graph.learn_conflict(literal, clause_unsatisfied)
             # One of the clauses can not be satisfied with the current assignment
             return None
 
         self.formula = self._unit_propagation_watch_literals(literal)
         return self.formula
 
-    @staticmethod
-    def boolean_resolution(c1, c2, shared_var):
-        c = c1, c2
-        return [l for l in c if c.variable != shared_var]
-
-    def learn_conflict(self, clause_unsatisfied_idx: int):
-        clause = self.formula[clause_unsatisfied_idx]
-        uip_node = self.implication_graph.find_first_uip(clause_unsatisfied_idx)
-        # TODO: Return the literal from the node
-        uip_literal = [l for l in clause if l.variable == uip_node.variable][0]
-        raise NotImplementedError
+    # def learn_conflict(self, last_assignment: Literal, clause_unsatisfied_idx: int):
+    #     clause = self.formula[clause_unsatisfied_idx]
+    #     uip_node = self.implication_graph.find_first_uip(clause_unsatisfied_idx)
+    #     # TODO: Return the literal from the node
+    #     uip_literal = [l for l in clause if l.variable == uip_node.variable][0]
+    #     raise NotImplementedError
 
     def _check_unsat(self, literal: Literal):
         '''
@@ -209,8 +212,7 @@ class DPLL(object):
         '''
         return self.formula.get_literal_appears_max(self._assignment[-1])
 
-    def search(self, propegate_helper: Optional[Callable[[Dict[str, bool]], bool]] = None,
-               conflict_helper: Optional[Callable[[Dict[str, bool]], List[str]]] = None) -> bool:
+    def search(self) -> bool:
 
         # if self.formula == []:
         #     # Forumla is UNSAT
@@ -238,8 +240,8 @@ class DPLL(object):
             cur_assignment = self._assignment
             cur_assignment.append(copy(self._assignment[-1]))
             dpll = DPLL(deepcopy(self.formula), watch_literals=self.watch_literals, partial_assignment=cur_assignment,
-                        implication_graph=self.implication_graph, implication_graph_root=None,
-                        is_first_run=False)
+                        implication_graph=self.implication_graph, is_first_run=False,
+                        conflict_helper=self.conflict_helper, propagate_helper=self.propgate_helper)
             dpll.assign_true_to_literal(Literal(next_decision, not d), reason=None)
             # formula = self.unit_propagation(formula)
             # TODO: use propagate_helper to update your current assignment (it's callable from smt solver)
@@ -247,6 +249,7 @@ class DPLL(object):
             sat = dpll.search()
             if sat:
                 self.unsat = False
+                # TODO: Make sure no conflicts in the SMT
                 return sat
 
             # clear the last decision
@@ -258,3 +261,5 @@ class DPLL(object):
             self._assignment.pop()
 
         return False
+
+

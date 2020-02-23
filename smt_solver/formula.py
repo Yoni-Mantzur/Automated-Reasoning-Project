@@ -274,15 +274,24 @@ class Formula(object):
         return CongruenceClosureAlgorithm(self).is_legal_sets()
 
     def conflict(self, partial_assignment: Dict[str, bool]) -> List[str]:
+        '''
+        Assuming there is a conflict in the current assignment and returns the clause which casues it
+        :param partial_assignment:
+        :return:
+        '''
+        assert not self.satisfied()
         conflict = []
         for var, value in partial_assignment.items():
             negated = '' if value else Operator.NEGATION.value
             conflict.append(negated + var)
 
-        self.conflicts.add(conflict)
         return conflict
 
     def propagate(self, partial_assignment: Dict[str, bool]) -> bool:
+        '''
+        Checks if the partial assignment is valid, if so, extend the assignment (propagation) and return True
+        otherwise, return False
+        '''
         from smt_solver.algorithms import CongruenceClosureAlgorithm
 
         self.update_mappings(partial_assignment)
@@ -303,13 +312,15 @@ class Formula(object):
         dpll_algorithm = DPLL(cnf_formula)
 
         # Solve sat formula
-        is_sat, partial_assignment = dpll_algorithm.search(self.propagate, self.conflict)
+        is_sat = dpll_algorithm.search(self.propagate, self.conflict)
 
         # Sat formula is unsat hence, smt formula is ussat
         if not is_sat:
             return False
 
-        # Sat formula is sat hence need to check smt formula
+        partial_assignment = dpll_algorithm.get_partial_assignment()
+        #DEBUG - Sat formula is sat hence need to check smt formula
         self.update_mappings(partial_assignment)
         if self.satisfied():
+            print(partial_assignment)
             return True

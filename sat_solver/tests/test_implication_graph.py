@@ -45,13 +45,13 @@ def test_first_uip_simple():
     g.add_decide_node(1, pos_l[1])
     g.add_node(1, pos_l[3], None, 2)
     g.add_node(1, pos_l[5], None, 1)
-    g.add_node(1, pos_l[2], None, 4)
+    g.add_node(1, neg_l[2], None, 4)
     # g.add_node(1, pos_l[2], None, 3)
-    g.add_node(1, pos_l[4], None, 3)
+    # g.add_node(1, pos_l[4], None, 3)
     # source_node = g._nodes[pos_l[1]]
     # target_node = g._nodes[pos_l[4]]
     actual_uip = g.find_first_uip(3)
-    expected_uip = pos_l[1]
+    expected_uip = g._nodes[pos_l[1].variable]
     assert actual_uip == expected_uip
 
 
@@ -96,11 +96,59 @@ def test_first_uip_complicated():
     g.add_node(3, neg_l[2], None, 1)
 
     actual_uip = g.find_first_uip(4)
-    expected_uip = pos_l[4]
+    expected_uip = g._nodes[pos_l[4].variable]
     assert actual_uip == expected_uip
 
 
+def test_boolean_resolution():
+    vars = [Variable('x{}'.format(i + 1)) for i in range(10)]
+    pos_l = [None] + [Literal(v, negated=False) for v in vars]
+    neg_l = [None] + [Literal(v, negated=True) for v in vars]
+
+    c0 = [pos_l[2], pos_l[3]]
+    c1 = [neg_l[4], neg_l[3]]
+    c_tag = ImplicationGraph.boolean_resolution(c0, c1, pos_l[3].variable)
+    expected_c_tag = [pos_l[2], neg_l[4]]
+    assert c_tag == expected_c_tag
+
+    c0 = [pos_l[2], neg_l[3], neg_l[5]]
+    c1 = [neg_l[4], pos_l[3], pos_l[1]]
+    c_tag = ImplicationGraph.boolean_resolution(c0, c1, pos_l[3].variable)
+    expected_c_tag = [pos_l[2], neg_l[4], neg_l[5], pos_l[1]]
+    assert sorted(c_tag) == sorted(expected_c_tag)
+
+
+def test_learn_conflict_simple():
+    return None
+    vars = [Variable('x{}'.format(i + 1)) for i in range(8)]
+    pos_l = [None] + [Literal(v, negated=False) for v in vars]
+    neg_l = [None] + [Literal(v, negated=True) for v in vars]
+
+    # x1 =True --> x3=True, x5=True  --> x2 = True,
+    clauses = [[pos_l[1]], [neg_l[1], pos_l[5]], [neg_l[1], pos_l[3]], [neg_l[2], neg_l[3]],
+               [neg_l[5], pos_l[2]]]
+    cnf = CnfFormula(clauses)
+    cnf = preprocess(cnf)
+    g = ImplicationGraph(cnf)
+
+    g.add_decide_node(1, pos_l[1])
+    g.add_node(1, pos_l[3], None, 2)
+    g.add_node(1, pos_l[5], None, 1)
+    g.add_node(1, neg_l[2], None, 4)
+    # g.add_node(1, pos_l[2], None, 3)
+    # g.add_node(1, pos_l[4], None, 3)
+
+    conflict_clause = g.learn_conflict(pos_l[3], 3)
+    expected_conflict_clause = [neg_l[1], neg_l[2]]
+    assert sorted(conflict_clause) == sorted(expected_conflict_clause)
+
+    conflict_clause = g.learn_conflict(neg_l[2], 3)
+    expected_conflict_clause = [neg_l[1], neg_l[3]]
+    assert sorted(conflict_clause) == sorted(expected_conflict_clause)
+
 if __name__ == "__main__":
-    test_first_uip_complicated()
+    test_learn_conflict_simple()
     test_first_uip_simple()
+    test_first_uip_complicated()
+    test_boolean_resolution()
     test_find_all_paths()
