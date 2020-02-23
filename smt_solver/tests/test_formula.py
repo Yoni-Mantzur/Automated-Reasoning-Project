@@ -1,3 +1,5 @@
+from copy import copy
+
 from smt_solver.formula import Term, FunctionTerm, PureTerm, Formula
 
 
@@ -19,9 +21,8 @@ def test_term_from_str(debug=True):
 
 
 def test_formula_from_str(debug=True):
-    for s in ['~r(r(x))=x', '(a=a|a=a)', '(r(x)=x|q(y)=y)', '(a=a&x=x)', '((r(x)=x&x=a)|q(x)=a)',
-              'r(r(x),y)=x', 'plus(s(x),y,s(plus(x,y)))=x', 'r(x8,x7,c)=a',
-              'r(x,y)=x', '~~~q(x)=x']:
+    for s in ['~q(x)=x', '((x=y|x=z)&(~x=y|z=r))', '~r(r(x))=x', '(a=a|a=a)', '(r(x)=x|q(y)=y)', '(a=a&x=x)',
+              '((r(x)=x&x=a)|q(x)=a)', 'r(r(x),y)=x', 'plus(s(x),y,s(plus(x,y)))=x', 'r(x8,x7,c)=a', 'r(x,y)=x']:
         if debug:
             print('Parsing', s, 'as a first-order formula...')
         formula = Formula.from_str(s)
@@ -76,7 +77,16 @@ def test_satisfied(debug=True):
 
 
 def test_propagation(debug=True):
-    pass
+    for s in ['(x=y&f(x)=f(y))']:
+        if debug:
+            print('Parsing', s, 'as a first-order formula...')
+        formula = Formula.from_str(s)
+        variables = list(formula.var_equation_mapping.keys())
+        partial_assignment = {variables[0]: True}
+        expected_assignment = copy(partial_assignment)
+        expected_assignment.update({variables[1]: False})
+        formula.propagate(partial_assignment)
+        assert partial_assignment == expected_assignment
 
 
 def test_conflict(debug=True):

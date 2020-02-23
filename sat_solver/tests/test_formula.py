@@ -14,7 +14,7 @@ def test_str(debug=True):
                           Operator.NEGATION)) == '~(p1&q7)'
 
 def test_from_str(debug=True):
-    for infix in ['~~(x1&~T)','~~p1', '~x12', '(x1&y1)', '~~(x1|~T)', '((x1&~x2)|F)']:
+    for infix in ['((x2|x3)&(x1|x5))','~~(x1&~T)','~~p1', '~x12', '(x1&y1)', '~~(x1|~T)', '((x1&~x2)|F)']:
         if debug:
             print("Testing from str parsing of formula", infix)
             assert str(SatFormula.from_str(infix)) == infix
