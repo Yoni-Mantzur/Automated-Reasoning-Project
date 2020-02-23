@@ -31,8 +31,8 @@ def test_up_unsat():
     actual_cnf = dpll.unit_propagation()
 
     assert actual_cnf is None
-    assert not dpll.get_full_assignment()['x3']
-    assert dpll.get_full_assignment()['x2']
+    assert not dpll.get_full_assignment()[x3_var]
+    assert dpll.get_full_assignment()[x2_var]
 
 
 def test_up_simple():
@@ -56,7 +56,7 @@ def test_up_simple():
     actual_cnf = dpll.unit_propagation()
     expected_cnf = [[x1,not_x2, x3], [not_x1, x3]]
 
-    assert dpll.get_full_assignment()['x2']
+    assert dpll.get_full_assignment()[x2_var]
     actual_cnf_real = [cl for cl in actual_cnf.clauses if cl != []]
     assert actual_cnf_real == expected_cnf, dpll.get_full_assignment()
 
@@ -239,10 +239,10 @@ if __name__ == '__main__':
     print("*" * 100)
     print("pass test_up_unsat")
     print("*" * 100)
-    # test_up_simple()
-    # print("*" * 100)
-    # print("pass test_up_simple")
-    # print("*" * 100)
+    test_up_simple()
+    print("*" * 100)
+    print("pass test_up_simple")
+    print("*" * 100)
     # test_search_complex_unsat()
     # print("*" * 100)
     # print("pass test_search_complex_unsat")

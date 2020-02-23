@@ -2,7 +2,7 @@ from copy import copy
 from typing import List, Dict, Optional, Set
 
 from common.operator import Operator
-from sat_solver.sat_formula import SatFormula, Literal
+from sat_solver.sat_formula import SatFormula, Literal, Variable
 
 
 def convert_iff_cnf_basic(lhs: Literal, rhs1: Literal, rhs2: Optional[Literal], operation: Operator):
@@ -147,11 +147,11 @@ class CnfFormula(object):
         self.literal_to_clauses[literal] = {}
         return True
 
-    def get_literal_appears_max(self, assignments):
+    def get_literal_appears_max(self, assignments: Dict[Variable, bool]) -> Literal:
         literals_length = {k: len(v) for k,v in self.literal_to_clauses.items()}
         literals_length_sorted = sorted(literals_length, key=literals_length.get, reverse=1)
         for l in literals_length_sorted:
-            if l.name not in assignments:
+            if l.variable not in assignments:
                 return l
         # # TODO: Might be helpful to keep the literal that apperas the most (for the decision heuristic)
         # return keywithmaxval(self.literal_to_clauses)

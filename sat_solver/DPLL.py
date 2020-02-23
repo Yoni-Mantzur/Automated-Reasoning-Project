@@ -10,17 +10,18 @@ from sat_solver.sat_formula import Literal, Variable
 
 # TODO: Do we need to implement also pure literal?
 class DPLL(object):
-    def __init__(self, cnf_forumla: CnfFormula, partial_assignment=None, watch_literals=None, implication_graph=None,
-                 is_first_run=True, propagate_helper: Optional[Callable[[
-                                                                            [Variable, bool]], bool]] = None,
-                 conflict_helper: Optional[Callable[[Dict[Variable, bool]], List[str]]] = None):
+    def __init__(self, cnf_formula: CnfFormula, partial_assignment=None, watch_literals=None, implication_graph=None,
+                 is_first_run=True,
+                 propagate_helper: Optional[Callable[[Variable, bool], bool]] = None,
+                 conflict_helper:  Optional[Callable[[Dict[Variable, bool]], List[str]]] = None):
         self._assignment = partial_assignment or [{}]
         self.watch_literals = watch_literals or defaultdict(list)
-        self.implication_graph = implication_graph or ImplicationGraph(cnf_forumla)  # implication_graph or {}
+        self.implication_graph = implication_graph or ImplicationGraph(cnf_formula)  # implication_graph or {}
 
-        self.formula = cnf_forumla
+        self.formula = cnf_formula
         self.conflict_helper = conflict_helper
-        self.propgate_helper = propagate_helper
+        self.propagate_helper = propagate_helper
+
 
         if self.watch_literals == {} and self.formula:
             self.initialize_watch_literals()
@@ -55,13 +56,12 @@ class DPLL(object):
         full_assignment = copy(self._assignment[-1])
         if self.formula:
             for v in self.formula.get_variables():
-                if v.name not in full_assignment:
-                    full_assignment[v.name] = True
+                if v not in full_assignment:
+                    full_assignment[v] = True
         return full_assignment
 
     def get_partial_assignment(self) -> Dict[Variable, bool]:
         return self._assignment[-1]
-
 
     def assign_true_to_literal(self, literal: Literal, reason: Optional[int]):
         '''
@@ -71,8 +71,8 @@ class DPLL(object):
         :param reason: the clause that caused this assignment, if None the reason is decided
         :return: None if can't do this assignment, otherwise a new formula (also editing the self._formulas[-1])
         '''
-        assert literal.name not in self._assignment[-1]
-        self._assignment[-1][literal.name] = not literal.negated
+        assert literal.variable not in self._assignment[-1]
+        self._assignment[-1][literal.variable] = not literal.negated
 
         # Add a node to the implication graph
 
@@ -117,13 +117,14 @@ class DPLL(object):
         for i, clause in enumerate(self.watch_literals[not_lit]):
             clause_unsatisfied = True if self.formula.clauses[clause] != [] else False
             for lit in self.formula.clauses[clause]:
-                if lit.name not in self._assignment[-1]:
+                if lit.variable not in self._assignment[-1]:
                     # One of the literals in the clause is assigned, skip to next clause
                     clause_unsatisfied = False
                     break
                 else:
                     # Make sure there is no True assignment that we forgot to delete
-                    assert self._assignment[-1][lit.name] == lit.negated
+                    # assert self._assignment[-1][lit.variable] == lit.negated
+                    pass
 
             if clause_unsatisfied:
                 # all literals are already assigned, this clause will not be satisfied
@@ -146,7 +147,7 @@ class DPLL(object):
             hope = True
             other_watch = None
             for lit in self.formula.clauses[sub_formula_idx]:
-                if lit.name not in self._assignment[-1]:
+                if lit.variable not in self._assignment[-1]:
                     # TODO: Try to avoid this O(n)
                     if sub_formula_idx in self.watch_literals[lit]:
                         other_watch = lit
@@ -163,7 +164,7 @@ class DPLL(object):
         if self.formula is None or self.formula.clauses == [[]]:
             return self.formula
         for (other_watch, sub_formula_idx) in learn_assingments:
-            if other_watch.name not in self._assignment[-1]:
+            if other_watch.variable not in self._assignment[-1]:
                 self.formula = self.assign_true_to_literal(other_watch, sub_formula_idx)
         return self.formula
 
@@ -241,7 +242,7 @@ class DPLL(object):
             cur_assignment.append(copy(self._assignment[-1]))
             dpll = DPLL(deepcopy(self.formula), watch_literals=self.watch_literals, partial_assignment=cur_assignment,
                         implication_graph=self.implication_graph, is_first_run=False,
-                        conflict_helper=self.conflict_helper, propagate_helper=self.propgate_helper)
+                        conflict_helper=self.conflict_helper, propagate_helper=self.propagate_helper)
             dpll.assign_true_to_literal(Literal(next_decision, not d), reason=None)
             # formula = self.unit_propagation(formula)
             # TODO: use propagate_helper to update your current assignment (it's callable from smt solver)
@@ -261,5 +262,3 @@ class DPLL(object):
             self._assignment.pop()
 
         return False
-
-
