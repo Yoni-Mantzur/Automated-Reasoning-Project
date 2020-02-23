@@ -1,4 +1,8 @@
-from sat_solver.ImplicationGraph import ImplicationGraph
+from itertools import count
+
+import pytest
+
+from sat_solver.ImplicationGraph import ImplicationGraph, Node
 from sat_solver.cnf_formula import CnfFormula
 from sat_solver.preprocessor import preprocess
 from sat_solver.sat_formula import Literal, Variable
@@ -24,8 +28,8 @@ def test_find_all_paths():
     source_node = g._nodes[pos_l[1]]
     target_node = g._nodes[pos_l[4]]
     actual_paths = g._find_all_paths(source_node, target_node)
-    expected_paths = [[pos_l[1].variable, pos_l[5], pos_l[2], pos_l[4]],
-                      [pos_l[1], pos_l[3], pos_l[4]]]
+    expected_paths = [[pos_l[1].variable, pos_l[5].variable, pos_l[2].variable, pos_l[4].variable],
+                      [pos_l[1].variable, pos_l[3].variable, pos_l[4].variable]]
 
     assert {(frozenset(item)) for item in actual_paths} == {(frozenset(item)) for item in expected_paths}
 
@@ -119,7 +123,7 @@ def test_boolean_resolution():
 
 
 def test_learn_conflict_simple():
-    return None
+
     vars = [Variable('x{}'.format(i + 1)) for i in range(8)]
     pos_l = [None] + [Literal(v, negated=False) for v in vars]
     neg_l = [None] + [Literal(v, negated=True) for v in vars]
@@ -146,9 +150,15 @@ def test_learn_conflict_simple():
     expected_conflict_clause = [neg_l[1], neg_l[3]]
     assert sorted(conflict_clause) == sorted(expected_conflict_clause)
 
+@pytest.fixture(autouse=True)
+def clean_counters():
+    Node._ids = count(-1)
+
+
 if __name__ == "__main__":
     test_learn_conflict_simple()
-    test_first_uip_simple()
-    test_first_uip_complicated()
-    test_boolean_resolution()
-    test_find_all_paths()
+    # Node._ids = count(-1)
+    # test_find_all_paths()
+    # test_first_uip_simple()
+    # test_first_uip_complicated()
+    # test_boolean_resolution()

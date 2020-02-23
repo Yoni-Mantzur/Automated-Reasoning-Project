@@ -120,9 +120,9 @@ class CnfFormula(object):
 
             literals = list(new_literals)
 
-        self.clauses += literals
+        self.clauses += [literals]
         for lit in literals:
-            self.literal_to_clauses[lit].update(len(self.clauses))
+            self.literal_to_clauses[lit].add(len(self.clauses) - 1)
 
     def remove_clause(self, indices):
         if isinstance(indices, int):

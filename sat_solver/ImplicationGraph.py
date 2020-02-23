@@ -1,16 +1,22 @@
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
+from copy import copy
 from typing import List, Dict
 
 from sat_solver.cnf_formula import CnfFormula
 from sat_solver.sat_formula import Literal, Variable
+from itertools import count
 
 class Node(object):
+    _ids = count(-1)
+    next(_ids)
+
     def __init__(self, literal: Literal, level: int):
         '''
         Create a node, the literal is used as a unique id, the level is just a property we might use
         '''
         self.literal = literal
         self.level = level
+        self.id = next(self._ids)
 
     def __eq__(self, other):
         return self.literal.variable == other.literal.variable
@@ -103,29 +109,22 @@ class ImplicationGraph(object):
     def learn_conflict(self, last_assigned: Literal, formula_idx: int) -> List[Literal]:
         # add the conflict node
         first_uip = self.find_first_uip(formula_idx)
-        uip_negate = first_uip.literal.negate()
+        if first_uip is None:
+            return []
+        uip_negate = copy(first_uip.literal).negate()
         node = self._nodes[last_assigned.variable]
+        c = self._formula.clauses[formula_idx]  # conflict clause
         while True:
             shared_var = node.literal.variable
-            clause_on_edge = self._formula.clauses[self._incoming_edges[node][-1].reason]
-            new_clause = self.boolean_resolution(self._formula.clauses[formula_idx], clause_on_edge, shared_var)
+            clause_on_edge = self._formula.clauses[self._incoming_edges[node][-1].reason]  # c' in the slides
+            new_clause = self.boolean_resolution(c, clause_on_edge, shared_var)
             if uip_negate in new_clause:
                 return new_clause
 
-            node = self._nodes[self.find_last_assigned_literal(new_clause).variable]
-
-    # def find_first_uip(self, formula_idx: int) -> Node:
-    #     if self._last_decide_node is None:
-    #         return None
-    #
-    #     # Add the conflict node and the edges
-    #     for lit in self._formula.clauses[formula_idx]:
-    #         n = self._nodes[lit.variable]
-    #         e = Edge(n, self._conflict_node, reason=formula_idx)
-    #         self._edges[n].append(e)
-    #         self._incoming_edges[self._conflict_node] = e
-    #
-    #
+            c = new_clause
+            # TODO: The presentation (lec 3 slide 29) says to pick the next node as one of the incoming to the new_clause
+            # but that might create a loop (as in test_learn_conflict_simple case 2)
+            node = self._nodes[self.find_last_assigned_literal(clause_on_edge).variable]
 
     def find_first_uip(self, formula_idx: int) -> Node:
         if self._last_decide_node is None:
@@ -134,11 +133,14 @@ class ImplicationGraph(object):
             n = self._nodes[lit.variable]
             e = Edge(n, self._conflict_node, reason=formula_idx)
             self._edges[n].append(e)
-            self._incoming_edges[self._conflict_node] = e
+            self._incoming_edges[self._conflict_node].append(e)
 
         paths = self._find_all_paths(self._last_decide_node, self._conflict_node)
-        other_paths = [set(p) for p in paths[1:]]
+        other_paths = paths[1:]
+        # After finding all paths we need to find first unique implication point
+        # Do that looking for a node that apperas in all paths, we do so be walking on one of the paths in reverse
         for path in paths:
+            path = list(path.keys())
             assert path[-1].name == 'Conflict'
             # reverse path and ignore the last node which should be conflict
             for node in path[:-1][::-1]:
@@ -147,16 +149,20 @@ class ImplicationGraph(object):
                     return self._nodes[node]
 
     def _find_all_paths(self, source: Node, target: Node):
-        if source == target:
-            return [[source.literal.variable]]
-        paths = []
-        for e in self._edges[source]:
-            t = self._find_all_paths(e.target, target)
-            t = [v for ls in t for v in ls]
-            paths.append([source.literal.variable] + t)
+        '''
+        Find all paths between source and target in linear time using dynamic programing
+        '''
+        partial_paths = defaultdict(list)
+        partial_paths[source.id].append({source.literal.variable: None})
 
-        # if isinstance(paths[0][0], list):
-        #     return [v for ls in paths for v in ls]
-        # else:
-        return paths
+        def _find_all_path_rec(source: Node, target: Node, partial_paths: List[List[OrderedDict]]):
+            for e in self._incoming_edges[target]:
+                if not partial_paths[e.source.id]:
+                    _find_all_path_rec(source, e.source, partial_paths)
+                for path in partial_paths[e.source.id]:
+                    new_path = copy(path)
+                    new_path.update({target.literal.variable: None})
+                    partial_paths[target.id].append(new_path)
 
+        _find_all_path_rec(source, target, partial_paths)
+        return partial_paths[target.id]

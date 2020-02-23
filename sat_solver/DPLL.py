@@ -21,7 +21,7 @@ class DPLL(object):
         self.formula = cnf_formula
         self.conflict_helper = conflict_helper
         self.propagate_helper = propagate_helper
-
+        self.learned_conflicts = None
 
         if self.watch_literals == {} and self.formula:
             self.initialize_watch_literals()
@@ -39,15 +39,20 @@ class DPLL(object):
         '''
 
         for i, clause in enumerate(self.formula.clauses):
-            if len(clause) <= 1:
-                self.watch_literals[clause[0]].append(i)
-                continue
-            first_lit = randint(0, len(clause) - 1)
-            second_lit = first_lit
-            while second_lit == first_lit:
-                second_lit = randint(0, len(clause) - 1)
-            self.watch_literals[clause[first_lit]].append(i)
-            self.watch_literals[clause[second_lit]].append(i)
+            self.create_watch_literals(i, clause)
+
+    def create_watch_literals(self, cluse_idx: int, clause: List[int] = []):
+        if clause == []:
+            clause = self.formula.clauses[cluse_idx]
+        if len(clause) <= 1:
+            self.watch_literals[clause[0]].append(cluse_idx)
+            return
+        first_lit = randint(0, len(clause) - 1)
+        second_lit = first_lit
+        while second_lit == first_lit:
+            second_lit = randint(0, len(clause) - 1)
+        self.watch_literals[clause[first_lit]].append(cluse_idx)
+        self.watch_literals[clause[second_lit]].append(cluse_idx)
 
     def get_full_assignment(self) -> Dict[Variable, bool]:
         # if self.unsat is None or self.unsat is True:
@@ -93,8 +98,10 @@ class DPLL(object):
 
         clause_unsatisfied = self._check_unsat(literal)
         if clause_unsatisfied is not None:
-            # self.implication_graph.learn_conflict(literal, clause_unsatisfied)
-            # One of the clauses can not be satisfied with the current assignment
+            # One of the clauses can not be satisfied with the current assignment, learn the conflict and go up the tree
+            conflict_clause = self.implication_graph.learn_conflict(literal, clause_unsatisfied)
+            # TODO: Understand why we got duplicate literals
+            self.learned_conflicts = list(set(conflict_clause))
             return None
 
         self.formula = self._unit_propagation_watch_literals(literal)
@@ -248,6 +255,9 @@ class DPLL(object):
             # TODO: use propagate_helper to update your current assignment (it's callable from smt solver)
 
             sat = dpll.search()
+            if dpll.learned_conflicts:
+                self.formula.add_clause(dpll.learned_conflicts)
+                self.create_watch_literals(len(self.formula.clauses) - 1)
             if sat:
                 self.unsat = False
                 # TODO: Make sure no conflicts in the SMT
