@@ -1,12 +1,14 @@
 import re
 from itertools import count
-from typing import List, Dict, Optional, Tuple, cast, Set
+from typing import List, Dict, Optional, Tuple, Set
 
 from common.operator import Operator
 from sat_solver.DPLL import DPLL
 from sat_solver.cnf_formula import CnfFormula
 from sat_solver.sat_formula import SatFormula, Variable, Literal
 from smt_solver.patterns import *
+
+NEGATED = True
 
 
 class Term(object):
@@ -156,13 +158,16 @@ class FunctionTerm(Term):
 
 
 class EquationTerm(Term):
-    def __init__(self, lhs: Term, rhs: Term, formula):
+    def __init__(self, lhs: Term, rhs: Term):
         super(EquationTerm, self).__init__(name=None)
         self.fake_variable = Variable(name='v%d' % self.idx)
+        self.fake_literals = [None, None]  # type: List[Optional[Literal]]
         self.name = self.fake_variable.name
-        self.fake_literals = [Literal(self.fake_variable, negated=False), Literal(self.fake_variable, negated=True)]
         self.lhs = lhs
         self.rhs = rhs
+
+    def add_literal(self, negated: bool):
+        self.fake_literals[negated] = Literal(self.fake_variable, negated)
 
     def get_terms(self):
         terms = self.lhs.get_terms()
@@ -175,7 +180,7 @@ class EquationTerm(Term):
         return functions
 
     def __str__(self):
-        return '{}={}'.format(str(self.lhs), str(self.rhs))
+        return str({self.lhs, self.rhs})
 
     def __repr__(self):
         return 'EquationTerm(%s)' % str(self)
@@ -199,7 +204,9 @@ class Formula(object):
     def __str__(self):
         formula = str(self.sat_formula)
         for literal, equation_idx in self.var_equation_mapping.items():
-            formula = formula.replace(str(literal), str(self.equations[equation_idx]))
+
+            equation = self.equations[equation_idx]
+            formula = formula.replace(str(literal), '{}={}'.format(str(equation.lhs), str(equation.rhs)))
         return formula
 
     def __repr__(self):
@@ -233,14 +240,13 @@ class Formula(object):
             else:
                 t1, s = FunctionTerm.from_str(raw_formula, formula)
                 t2, s = FunctionTerm.from_str(s[1:], formula)
-                equation = EquationTerm(t1, t2, formula)
+                equation = EquationTerm(t1, t2)
                 equation = formula.update_equations(equation)
                 return SatFormula.create_leaf(equation.name, equation.fake_variable), s
 
         formula = Formula()
         formula.sat_formula = from_str_helper(raw_formula)[0]
-        formula.update_mappings({literal.variable: literal.negated for literal in
-                                 formula.sat_formula.get_literals()}, update_equations=True)
+        formula.set_literals()
         return formula
 
     def update_equations(self, equation: EquationTerm) -> EquationTerm:
@@ -253,19 +259,37 @@ class Formula(object):
         equation = self.equations[self.equations_to_idx[equation]]
         return equation
 
-    def update_mappings(self, partial_assignment: Dict[Variable, bool], update_equations=False):
+    def set_literals(self):
+        for literal in self.sat_formula.get_literals():
+            equation = self.equations[self.var_equation_mapping[literal.variable]]
+            equation.add_literal(literal.negated)
+
+    def update_mappings(self, partial_assignment: Dict[Variable, bool]):
         self.equalities = set()
         self.inequalities = set()
+
         for v, assigned_true in partial_assignment.items():
             equation = self.equations[self.var_equation_mapping[v]]
 
             if assigned_true:
-                self.equalities.add(equation.idx)
-            else:
-                self.inequalities.add(equation.idx)
 
-    def satisfied(self) -> bool:
+                if equation.fake_literals[not NEGATED]:
+                    self.equalities.add(equation.idx)
+
+                if equation.fake_literals[NEGATED]:
+                    self.inequalities.add(equation.idx)
+
+            else:
+
+                if equation.fake_literals[NEGATED]:
+                    self.equalities.add(equation.idx)
+
+                elif equation.fake_literals[not NEGATED]:
+                    self.inequalities.add(equation.idx)
+
+    def satisfied(self, partial_assignment: Dict[Variable, bool]) -> bool:
         from smt_solver.algorithms import CongruenceClosureAlgorithm
+        self.update_mappings(partial_assignment)
         return CongruenceClosureAlgorithm(self).is_legal_sets()
 
     def conflict(self, partial_assignment: Dict[Variable, bool]) -> List[Literal]:
@@ -274,11 +298,17 @@ class Formula(object):
         :param partial_assignment:
         :return:
         '''
-        assert not self.satisfied()
+
         conflict = []
+
+        # No conflicts
+        if self.satisfied(partial_assignment):
+            return conflict
+
         for v, value in partial_assignment.items():
             equation = self.equations[self.var_equation_mapping[v]]
-            literal = equation.fake_literals[1] if value else equation.fake_literals[0]
+            negated_value = value
+            literal = equation.fake_literals[negated_value]
             conflict.append(literal)
         return conflict
 
@@ -295,12 +325,26 @@ class Formula(object):
         if not classes_algorithm.is_legal_sets():
             return False
 
-        for var, equation in self.var_equation_mapping.items():
+        for var, equation_idx in self.var_equation_mapping.items():
             non_assigned_var = var not in partial_assignment
-            if non_assigned_var and classes_algorithm.is_equation_is_true(equation):
-                # Learn equality to be true and inequality to be false
-                partial_assignment[var] = True
+            if non_assigned_var:
 
+                assign_true = classes_algorithm.is_equation_is_true(equation_idx)
+                equation = self.equations[equation_idx]
+
+                # Conflict - same class, but literal appears with negated and with out
+                if assign_true and equation.fake_literals[NEGATED] and equation.fake_literals[not NEGATED]:
+                    return False
+
+                # Assign False - same class, but literal appears with negated
+                elif assign_true and equation.fake_literals[NEGATED]:
+                    partial_assignment[var] = not assign_true
+
+                # Assign True - same class and literal appears without negated
+                elif assign_true and equation.fake_literals[not NEGATED]:
+                    partial_assignment[var] = assign_true
+
+        return True
 
     def solve(self) -> bool:
         cnf_formula = CnfFormula.from_str(str(self.sat_formula))
@@ -315,7 +359,7 @@ class Formula(object):
 
         partial_assignment = dpll_algorithm.get_partial_assignment()
 
-        #DEBUG - Sat formula is sat hence need to check smt formula
+        # DEBUG - Sat formula is sat hence need to check smt formula
         print(partial_assignment)
         self.update_mappings(partial_assignment)
-        return self.satisfied()
+        return self.satisfied(partial_assignment)
