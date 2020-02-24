@@ -101,10 +101,29 @@ class ImplicationGraph(object):
                 max_level = self._nodes[l.variable].level
         return last_literal
 
+    def get_backjump_level(self, conflict_clause: List[Literal]) -> int:
+        '''
+        Get the second highest decision level in the conflict clause
+        if only one decision was made, zero
+        '''
+        max_level = 0
+        second_max = 0
+        levels = set(self.get_decision_levels(conflict_clause))
+        for level in levels:
+            if level > max_level:
+                second_max = max_level
+                max_level = level
+            elif level > second_max:
+                second_max = level
+        return second_max
+
     @staticmethod
     def boolean_resolution(c1: List[Literal], c2: List[Literal], shared_var: Variable) -> List[Literal]:
         c = c1 + c2
         return [l for l in c if l.variable != shared_var]
+
+    def get_decision_levels(self, clause: List[Literal]):
+        return [self._nodes[lit.variable].level for lit in clause]
 
     def learn_conflict(self, last_assigned: Literal, formula_idx: int) -> List[Literal]:
         # add the conflict node

@@ -8,58 +8,6 @@ from sat_solver.cnf_formula import CnfFormula
 from sat_solver.preprocessor import preprocess
 from sat_solver.sat_formula import Literal, Variable
 
-
-def test_find_all_paths():
-    vars = [Variable('x{}'.format(i + 1)) for i in range(8)]
-    pos_l = [None] + [Literal(v, negated=False) for v in vars]
-    neg_l = [None] + [Literal(v, negated=True) for v in vars]
-
-    clauses = [[pos_l[1]], [neg_l[1], pos_l[5]], [neg_l[1], pos_l[3]], [neg_l[2], neg_l[3], pos_l[4]],
-               [neg_l[5], pos_l[2]]]
-    cnf = CnfFormula(clauses)
-    cnf = preprocess(cnf)
-    g = ImplicationGraph(cnf)
-
-    g.add_decide_node(1, pos_l[1])
-    g.add_node(1, pos_l[3], None, 2)
-    g.add_node(1, pos_l[5], None, 1)
-    g.add_node(1, pos_l[2], None, 4)
-    # g.add_node(1, pos_l[2], None, 3)
-    g.add_node(1, pos_l[4], None, 3)
-    source_node = g._nodes[pos_l[1]]
-    target_node = g._nodes[pos_l[4]]
-    actual_paths = g._find_all_paths(source_node, target_node)
-    expected_paths = [[pos_l[1].variable, pos_l[5].variable, pos_l[2].variable, pos_l[4].variable],
-                      [pos_l[1].variable, pos_l[3].variable, pos_l[4].variable]]
-
-    assert {(frozenset(item)) for item in actual_paths} == {(frozenset(item)) for item in expected_paths}
-
-
-def test_first_uip_simple():
-    vars = [Variable('x{}'.format(i + 1)) for i in range(8)]
-    pos_l = [None] + [Literal(v, negated=False) for v in vars]
-    neg_l = [None] + [Literal(v, negated=True) for v in vars]
-
-    # x1 =True --> x3=True, x5=True  --> x2 = True,
-    clauses = [[pos_l[1]], [neg_l[1], pos_l[5]], [neg_l[1], pos_l[3]], [neg_l[2], neg_l[3]],
-               [neg_l[5], pos_l[2]]]
-    cnf = CnfFormula(clauses)
-    cnf = preprocess(cnf)
-    g = ImplicationGraph(cnf)
-
-    g.add_decide_node(1, pos_l[1])
-    g.add_node(1, pos_l[3], None, 2)
-    g.add_node(1, pos_l[5], None, 1)
-    g.add_node(1, neg_l[2], None, 4)
-    # g.add_node(1, pos_l[2], None, 3)
-    # g.add_node(1, pos_l[4], None, 3)
-    # source_node = g._nodes[pos_l[1]]
-    # target_node = g._nodes[pos_l[4]]
-    actual_uip = g.find_first_uip(3)
-    expected_uip = g._nodes[pos_l[1].variable]
-    assert actual_uip == expected_uip
-
-
 def get_complicated_graph() -> (ImplicationGraph, int, List[Variable]):
     variables = [Variable('TEMP')] + [Variable('x{}'.format(i + 1)) for i in range(10)]
     pos_l = [Literal(v, negated=False) for v in variables]
@@ -103,6 +51,62 @@ def get_complicated_graph() -> (ImplicationGraph, int, List[Variable]):
     return g, 1, variables
 
 
+def get_simple_graph() -> (ImplicationGraph, int, List[Variable]):
+    variables = [Variable('TEMP')] + [Variable('x{}'.format(i + 1)) for i in range(8)]
+    pos_l = [Literal(v, negated=False) for v in variables]
+    neg_l = [Literal(v, negated=True) for v in variables]
+
+    # x1 =True --> x3=True, x5=True  --> x2 = True,
+    clauses = [[pos_l[1]], [neg_l[1], pos_l[5]], [neg_l[1], pos_l[3]], [neg_l[2], neg_l[3]],
+               [neg_l[5], pos_l[2]]]
+    cnf = CnfFormula(clauses)
+    cnf = preprocess(cnf)
+    g = ImplicationGraph(cnf)
+
+    g.add_decide_node(1, pos_l[1])
+    g.add_node(1, pos_l[3], None, 2)
+    g.add_node(1, pos_l[5], None, 1)
+    g.add_node(1, neg_l[2], None, 4)
+    # g.add_node(1, pos_l[2], None, 3)
+    # g.add_node(1, pos_l[4], None, 3)
+
+    return g, 3, variables
+
+
+def test_find_all_paths():
+    vars = [Variable('x{}'.format(i + 1)) for i in range(8)]
+    pos_l = [None] + [Literal(v, negated=False) for v in vars]
+    neg_l = [None] + [Literal(v, negated=True) for v in vars]
+
+    clauses = [[pos_l[1]], [neg_l[1], pos_l[5]], [neg_l[1], pos_l[3]], [neg_l[2], neg_l[3], pos_l[4]],
+               [neg_l[5], pos_l[2]]]
+    cnf = CnfFormula(clauses)
+    cnf = preprocess(cnf)
+    g = ImplicationGraph(cnf)
+
+    g.add_decide_node(1, pos_l[1])
+    g.add_node(1, pos_l[3], None, 2)
+    g.add_node(1, pos_l[5], None, 1)
+    g.add_node(1, pos_l[2], None, 4)
+    # g.add_node(1, pos_l[2], None, 3)
+    g.add_node(1, pos_l[4], None, 3)
+    source_node = g._nodes[pos_l[1]]
+    target_node = g._nodes[pos_l[4]]
+    actual_paths = g._find_all_paths(source_node, target_node)
+    expected_paths = [[pos_l[1].variable, pos_l[5].variable, pos_l[2].variable, pos_l[4].variable],
+                      [pos_l[1].variable, pos_l[3].variable, pos_l[4].variable]]
+
+    assert {(frozenset(item)) for item in actual_paths} == {(frozenset(item)) for item in expected_paths}
+
+
+def test_first_uip_simple():
+    g, conflict_idx, variables = get_simple_graph()
+
+    actual_uip = g.find_first_uip(conflict_idx)
+    expected_uip = g._nodes[variables[1]]
+    assert actual_uip == expected_uip
+
+
 def test_first_uip_complicated():
     g, conflict_idx, variables = get_complicated_graph()
 
@@ -131,30 +135,14 @@ def test_boolean_resolution():
 
 def test_learn_conflict_simple():
 
-    vars = [Variable('x{}'.format(i + 1)) for i in range(8)]
-    pos_l = [None] + [Literal(v, negated=False) for v in vars]
-    neg_l = [None] + [Literal(v, negated=True) for v in vars]
+    g, conflict_idx, variables = get_simple_graph()
 
-    # x1 =True --> x3=True, x5=True  --> x2 = True,
-    clauses = [[pos_l[1]], [neg_l[1], pos_l[5]], [neg_l[1], pos_l[3]], [neg_l[2], neg_l[3]],
-               [neg_l[5], pos_l[2]]]
-    cnf = CnfFormula(clauses)
-    cnf = preprocess(cnf)
-    g = ImplicationGraph(cnf)
-
-    g.add_decide_node(1, pos_l[1])
-    g.add_node(1, pos_l[3], None, 2)
-    g.add_node(1, pos_l[5], None, 1)
-    g.add_node(1, neg_l[2], None, 4)
-    # g.add_node(1, pos_l[2], None, 3)
-    # g.add_node(1, pos_l[4], None, 3)
-
-    conflict_clause = g.learn_conflict(pos_l[3], 3)
-    expected_conflict_clause = [neg_l[1], neg_l[2]]
+    conflict_clause = g.learn_conflict(Literal(variables[3], False), conflict_idx)
+    expected_conflict_clause = [Literal(variables[1], True), Literal(variables[2], True)]
     assert sorted(conflict_clause) == sorted(expected_conflict_clause)
 
-    conflict_clause = g.learn_conflict(neg_l[2], 3)
-    expected_conflict_clause = [neg_l[1], neg_l[3]]
+    conflict_clause = g.learn_conflict(Literal(variables[2], True), conflict_idx)
+    expected_conflict_clause = [Literal(variables[1], True), Literal(variables[3], True)]
     assert sorted(conflict_clause) == sorted(expected_conflict_clause)
 
 
@@ -170,12 +158,30 @@ def test_learn_conflict_complicated():
     # assert actual_uip == expected_uip
 
 
+def test_backjump_simple():
+    g, conflict_idx, variables = get_simple_graph()
+
+    conflict_clause = g.learn_conflict(Literal(variables[3], False), conflict_idx)
+    level = g.get_backjump_level(conflict_clause)
+    expected_level = 0
+    assert level == expected_level
+
+
+def test_backjump_complicated():
+    g, conflict_idx, variables = get_complicated_graph()
+
+    conflict_clause = g.learn_conflict(Literal(variables[3], True), conflict_idx)
+    level = g.get_backjump_level(conflict_clause)
+    expected_level = 0
+    assert level == expected_level
+
 @pytest.fixture(autouse=True)
 def clean_counters():
     Node._ids = count(-1)
 
 
 if __name__ == "__main__":
+    test_backjump_complicated()
     test_learn_conflict_complicated()
     test_learn_conflict_simple()
     test_first_uip_complicated()

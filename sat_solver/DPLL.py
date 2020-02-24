@@ -22,6 +22,7 @@ class DPLL(object):
         self.conflict_helper = conflict_helper
         self.propagate_helper = propagate_helper
         self.learned_conflicts = None
+        self.backjump = None
 
         if self.watch_literals == {} and self.formula:
             self.initialize_watch_literals()
@@ -102,6 +103,8 @@ class DPLL(object):
             conflict_clause = self.implication_graph.learn_conflict(literal, clause_unsatisfied)
             # TODO: Understand why we got duplicate literals
             self.learned_conflicts = list(set(conflict_clause))
+            self.backjump = self.implication_graph.get_backjump_level(conflict_clause)
+
             return None
 
         self.formula = self._unit_propagation_watch_literals(literal)
@@ -244,6 +247,12 @@ class DPLL(object):
 
         assignment_order = [False, True] if next_decision_lit.negated else [True, False]
         for d in assignment_order:
+            if self.backjump and self.backjump > len(self._assignment) - 1:
+                # Skip this level
+                return False
+            elif self.backjump == len(self._assignment) - 1:
+                # Finished to do backjump
+                self.backjump = None
             # current_assignment = copy(self._assignment)
             cur_assignment = self._assignment
             cur_assignment.append(copy(self._assignment[-1]))
@@ -258,6 +267,7 @@ class DPLL(object):
             if dpll.learned_conflicts:
                 self.formula.add_clause(dpll.learned_conflicts)
                 self.create_watch_literals(len(self.formula.clauses) - 1)
+                self.backjump = dpll.backjump
             if sat:
                 self.unsat = False
                 # TODO: Make sure no conflicts in the SMT
