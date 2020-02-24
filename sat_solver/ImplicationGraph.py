@@ -108,6 +108,7 @@ class ImplicationGraph(object):
         '''
         max_level = 0
         second_max = 0
+
         levels = set(self.get_decision_levels(conflict_clause))
         for level in levels:
             if level > max_level:
@@ -123,7 +124,7 @@ class ImplicationGraph(object):
         return [l for l in c if l.variable != shared_var]
 
     def get_decision_levels(self, clause: List[Literal]):
-        return [self._nodes[lit.variable].level for lit in clause]
+        return [self._nodes[lit.variable].level for lit in clause if lit.variable in self._nodes]
 
     def learn_conflict(self, last_assigned: Literal, formula_idx: int) -> List[Literal]:
         # add the conflict node
@@ -132,7 +133,11 @@ class ImplicationGraph(object):
             return []
         uip_negate = copy(first_uip.literal).negate()
         node = self._nodes[last_assigned.variable]
-        c = self._formula.clauses[formula_idx]  # conflict clause
+        c = self._formula.clauses[formula_idx]
+        if not self._incoming_edges[node]:
+            # No incoming edges to the node, can't resolve the conflict
+            return c
+        # conflict clause
         while True:
             shared_var = node.literal.variable
             clause_on_edge = self._formula.clauses[self._incoming_edges[node][-1].reason]  # c' in the slides
@@ -149,6 +154,8 @@ class ImplicationGraph(object):
         if self._last_decide_node is None:
             return None
         for lit in self._formula.clauses[formula_idx]:
+            if lit.variable not in self._nodes:
+                continue
             n = self._nodes[lit.variable]
             e = Edge(n, self._conflict_node, reason=formula_idx)
             self._edges[n].append(e)

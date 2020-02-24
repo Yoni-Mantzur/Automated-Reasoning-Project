@@ -12,7 +12,7 @@ from sat_solver.sat_formula import Literal, Variable
 class DPLL(object):
     def __init__(self, cnf_formula: CnfFormula, partial_assignment=None, watch_literals=None, implication_graph=None,
                  is_first_run=True,
-                 propagate_helper: Callable[[Dict[Variable, bool]], bool] = None,
+                 propagate_helper: Callable[[Dict[Variable, bool]], Dict[Variable, bool]] = None,
                  conflict_helper:  Callable[[Dict[Variable, bool]], List[Literal]] = None):
         self._assignment = partial_assignment or [{}]
         self.watch_literals = watch_literals or defaultdict(list)
@@ -21,7 +21,7 @@ class DPLL(object):
         self.formula = cnf_formula
         self.conflict_helper = conflict_helper
         self.propagate_helper = propagate_helper
-        self.learned_conflicts = None
+        self.learned_sat_conflicts = None
         self.backjump = None
 
         if self.watch_literals == {} and self.formula:
@@ -69,6 +69,12 @@ class DPLL(object):
     def get_partial_assignment(self) -> Dict[Variable, bool]:
         return self._assignment[-1]
 
+    def remove_clauses_by_assignment(self, literal: Literal):
+        # We decided that lit is True (lit might be ~x_1, then x_1 is False)
+        # Remove all clauses that has lit (they are satisfied), and delete ~lit from all other clauses
+        removed_clauses = set(self.formula.literal_to_clauses[literal])
+        return self.formula.remove_clause(removed_clauses)
+
     def assign_true_to_literal(self, literal: Literal, reason: Optional[int]):
         '''
         Assigns true to the given literal, i.e. remove all clauses that this literal is in
@@ -77,7 +83,7 @@ class DPLL(object):
         :param reason: the clause that caused this assignment, if None the reason is decided
         :return: None if can't do this assignment, otherwise a new formula (also editing the self._formulas[-1])
         '''
-        assert literal.variable not in self._assignment[-1]
+        assert literal.variable not in self._assignment[-1], literal.variable
         self._assignment[-1][literal.variable] = not literal.negated
 
         # Add a node to the implication graph
@@ -87,13 +93,10 @@ class DPLL(object):
         if reason is None:
             self.implication_graph.add_decide_node(level, literal)
         else:
+            # TODO: Should I add assignment from propgation of theroy solver?
             self.implication_graph.add_node(level, literal, self.formula.clauses[reason], reason)
 
-        # We decided that lit is True (lit might be ~x_1, then x_1 is False)
-        # Remove all clauses that has lit (they are satisfied), and delete ~lit from all other clauses
-        removed_clauses = set(self.formula.literal_to_clauses[literal])
-        if not self.formula.remove_clause(removed_clauses):
-            # Indicate the query is SAT
+        if not self.remove_clauses_by_assignment(literal):
             self.formula.clauses = [[]]
             return self.formula
 
@@ -102,20 +105,13 @@ class DPLL(object):
             # One of the clauses can not be satisfied with the current assignment, learn the conflict and go up the tree
             conflict_clause = self.implication_graph.learn_conflict(literal, clause_unsatisfied)
             # TODO: Understand why we got duplicate literals
-            self.learned_conflicts = list(set(conflict_clause))
+            self.learned_sat_conflicts = list(set(conflict_clause))
             self.backjump = self.implication_graph.get_backjump_level(conflict_clause)
 
             return None
 
         self.formula = self._unit_propagation_watch_literals(literal)
         return self.formula
-
-    # def learn_conflict(self, last_assignment: Literal, clause_unsatisfied_idx: int):
-    #     clause = self.formula[clause_unsatisfied_idx]
-    #     uip_node = self.implication_graph.find_first_uip(clause_unsatisfied_idx)
-    #     # TODO: Return the literal from the node
-    #     uip_literal = [l for l in clause if l.variable == uip_node.variable][0]
-    #     raise NotImplementedError
 
     def _check_unsat(self, literal: Literal):
         '''
@@ -190,7 +186,7 @@ class DPLL(object):
         while found == True:
             found = False
             for i, sub_forumla in enumerate(self.formula.clauses):
-                if len(sub_forumla) == 1:
+                 if len(sub_forumla) == 1:
                     found = True
                     lit = sub_forumla[0]
                     # assert lit.name not in self._assignment
@@ -223,16 +219,24 @@ class DPLL(object):
         '''
         return self.formula.get_literal_appears_max(self._assignment[-1])
 
-    def search(self) -> bool:
+    def check_theory_conflict(self) -> bool:
+        if self.conflict_helper:
+            smt_conflict = self.conflict_helper(self._assignment[-1])
+            if smt_conflict:
+                self.formula.add_clause(smt_conflict)
+                self.create_watch_literals(len(self.formula.clauses) - 1)
+                return False
+        return True
 
-        # if self.formula == []:
-        #     # Forumla is UNSAT
-        #     return True
+    def search(self) -> bool:
         if self.formula is None:
             # Formula is unsat
             return False
         real_formula = [f for f in self.formula.clauses if f != []]
-        if real_formula == []:
+        if not real_formula:
+            if not self.check_theory_conflict():
+                # The current assingment satafias all clauses but theroy finds a conflict
+                return False
             # Found valid assinment
             self.unsat = False
             return True
@@ -240,6 +244,31 @@ class DPLL(object):
         # current_variables = self.formula.get_variables()
         # TOOD: does this heuristic make sense? we try the literal which appears the most, but if it is UNSAT we negate
         # it and try again, the second literal might not be very helpful
+
+        self.check_theory_conflict()
+        if self.propagate_helper:
+            smt_res = self.propagate_helper(self._assignment[-1])
+            self._assignment[-1].update(smt_res)
+            print(self._assignment[-1])
+            for variable, val in smt_res.items():
+                if val:
+                    lit = Literal(variable, False)
+                else:
+                    lit = Literal(variable, True)
+
+                if not self.remove_clauses_by_assignment(lit):
+                    self.formula.clauses = [[]]
+                    return self.formula
+            # if not self.remove_clauses_by_assignment(lit):
+            #     self.formula.clauses = [[]]
+            #     return self.formula
+
+            print(self._assignment[-1])
+            print("*"*100)
+            if not smt_res:
+                # Conflict
+                return False
+
         next_decision_lit = self.decision_heuristic()
         assert isinstance(next_decision_lit, Literal)
         next_decision = next_decision_lit.variable
@@ -256,6 +285,8 @@ class DPLL(object):
             # current_assignment = copy(self._assignment)
             cur_assignment = self._assignment
             cur_assignment.append(copy(self._assignment[-1]))
+
+
             dpll = DPLL(deepcopy(self.formula), watch_literals=self.watch_literals, partial_assignment=cur_assignment,
                         implication_graph=self.implication_graph, is_first_run=False,
                         conflict_helper=self.conflict_helper, propagate_helper=self.propagate_helper)
@@ -264,11 +295,16 @@ class DPLL(object):
             # TODO: use propagate_helper to update your current assignment (it's callable from smt solver)
 
             sat = dpll.search()
-            if dpll.learned_conflicts:
-                self.formula.add_clause(dpll.learned_conflicts)
+            if dpll.learned_sat_conflicts:
+                self.formula.add_clause(dpll.learned_sat_conflicts)
                 self.create_watch_literals(len(self.formula.clauses) - 1)
                 self.backjump = dpll.backjump
+
             if sat:
+                if not self.check_theory_conflict():
+                    # The current assingment satafias all clauses but theroy finds a conflict
+                    return False
+                # Before decalring sat make sure no conflict in the theory solver
                 self.unsat = False
                 # TODO: Make sure no conflicts in the SMT
                 return sat

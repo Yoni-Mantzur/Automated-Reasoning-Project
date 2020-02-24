@@ -1,8 +1,8 @@
 from collections import defaultdict
 from typing import Set, Dict
 
-from sat_solver.cnf_formula import CnfFormula
-from sat_solver.sat_formula import Literal
+from sat_solver.cnf_formula import CnfFormula, tseitins_transformation
+from sat_solver.sat_formula import Literal, SatFormula
 
 
 def remove_redundant_literals(formula: CnfFormula) -> CnfFormula:
@@ -45,6 +45,10 @@ def delete_trivial_clauses(formula: CnfFormula) -> CnfFormula:
 
     return CnfFormula(new_clauses, literal_to_clauses)
 
+
+def preprocess_from_sat(formula: SatFormula) -> CnfFormula:
+    clauses = tseitins_transformation(formula)
+    return preprocess(CnfFormula(clauses))
 
 def preprocess(formula: CnfFormula) -> CnfFormula:
     formula = remove_redundant_literals(formula)

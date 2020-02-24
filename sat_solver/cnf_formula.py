@@ -2,6 +2,7 @@ from copy import copy
 from typing import List, Dict, Optional, Set
 
 from common.operator import Operator
+
 from sat_solver.sat_formula import SatFormula, Literal, Variable
 
 
@@ -90,6 +91,7 @@ class CnfFormula(object):
         self.empty_clauses = 0
         self.literal_to_clauses = literal_to_clauses
 
+
     @staticmethod
     def from_str(formula: str):
         clauses = tseitins_transformation(SatFormula.from_str(formula))
@@ -108,17 +110,17 @@ class CnfFormula(object):
     def __repr__(self):
         return str(self)
 
-    def add_clause(self, literals):
+    def add_clause(self, literals: List[Literal]) -> None:
         # TODO: when using this dont forget to update the watch_literals
-        if literals and isinstance(literals[0], str):
-            # parse literals to clause
-            new_literals = []
-            for literal in literals:
-                negated = True if literal[0] == Operator.NEGATION else False
-                literal = literal[1:] if negated else literal
-                new_literals.append(Literal.from_name(literal, negated))
-
-            literals = list(new_literals)
+        # if literals and isinstance(literals[0], str):
+        #     # parse literals to clause
+        #     new_literals = []
+        #     for literal in literals:
+        #         negated = True if literal[0] == Operator.NEGATION else False
+        #         literal = literal[1:] if negated else literal
+        #         new_literals.append(Literal.from_name(literal, negated))
+        #
+        #     literals = list(new_literals)
 
         self.clauses += [literals]
         for lit in literals:
@@ -155,3 +157,5 @@ class CnfFormula(object):
                 return l
         # # TODO: Might be helpful to keep the literal that apperas the most (for the decision heuristic)
         # return keywithmaxval(self.literal_to_clauses)
+
+

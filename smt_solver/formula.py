@@ -269,22 +269,18 @@ class Formula(object):
         self.inequalities = set()
 
         for v, assigned_true in partial_assignment.items():
+            if v not in self.var_equation_mapping:
+                # We care only about variables from this theory
+                continue
+
             equation = self.equations[self.var_equation_mapping[v]]
 
             if assigned_true:
-
                 if equation.fake_literals[not NEGATED]:
                     self.equalities.add(equation.idx)
 
-                if equation.fake_literals[NEGATED]:
-                    self.inequalities.add(equation.idx)
-
             else:
-
                 if equation.fake_literals[NEGATED]:
-                    self.equalities.add(equation.idx)
-
-                elif equation.fake_literals[not NEGATED]:
                     self.inequalities.add(equation.idx)
 
     def satisfied(self, partial_assignment: Dict[Variable, bool]) -> bool:
@@ -306,24 +302,26 @@ class Formula(object):
             return conflict
 
         for v, value in partial_assignment.items():
+            if v not in self.var_equation_mapping:
+                continue
             equation = self.equations[self.var_equation_mapping[v]]
             negated_value = value
-            literal = equation.fake_literals[negated_value]
+            literal = Literal(equation.fake_variable, negated_value)
             conflict.append(literal)
         return conflict
 
-    def propagate(self, partial_assignment: Dict[Variable, bool]) -> bool:
+    def propagate(self, partial_assignment: Dict[Variable, bool]) -> Dict[Variable, bool]:
         '''
         Checks if the partial assignment is valid, if so, extend the assignment (propagation) and return True
         otherwise, return False
         '''
         from smt_solver.algorithms import CongruenceClosureAlgorithm
-
+        assignments = {}
         self.update_mappings(partial_assignment)
         classes_algorithm = CongruenceClosureAlgorithm(self)
 
         if not classes_algorithm.is_legal_sets():
-            return False
+            return {}
 
         for var, equation_idx in self.var_equation_mapping.items():
             non_assigned_var = var not in partial_assignment
@@ -332,22 +330,19 @@ class Formula(object):
                 assign_true = classes_algorithm.is_equation_is_true(equation_idx)
                 equation = self.equations[equation_idx]
 
-                # Conflict - same class, but literal appears with negated and with out
-                if assign_true and equation.fake_literals[NEGATED] and equation.fake_literals[not NEGATED]:
-                    return False
+                # TODO: for debug
+                negated_literal = equation.fake_literals[NEGATED]
+                positive_literal = equation.fake_literals[not NEGATED]
+                assert not (assign_true and negated_literal and positive_literal)
 
-                # Assign False - same class, but literal appears with negated
-                elif assign_true and equation.fake_literals[NEGATED]:
-                    partial_assignment[var] = not assign_true
+                if assign_true:
+                    assignments[var] = assign_true
 
-                # Assign True - same class and literal appears without negated
-                elif assign_true and equation.fake_literals[not NEGATED]:
-                    partial_assignment[var] = assign_true
-
-        return True
+        return assignments
 
     def solve(self) -> bool:
-        cnf_formula = CnfFormula.from_str(str(self.sat_formula))
+        from sat_solver.preprocessor import preprocess_from_sat
+        cnf_formula = preprocess_from_sat(self.sat_formula)
         dpll_algorithm = DPLL(cnf_formula, propagate_helper=self.propagate, conflict_helper=self.conflict)
 
         # Solve sat formula

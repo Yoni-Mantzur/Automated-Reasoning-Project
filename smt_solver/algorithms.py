@@ -8,13 +8,14 @@ class CongruenceClosureAlgorithm(object):
         self.formula = copy.deepcopy(formula)
 
         for equality in self.formula.equalities:
-            self.process(t1=formula.equations[equality].lhs, t2=formula.equations[equality].rhs)
+            self.process(t1=self.formula.equations[equality].lhs, t2=self.formula.equations[equality].rhs)
 
     def find_representative(self, t: Term) -> Term:
         next_ptr = t.next_ptr
         t = self.formula.terms[next_ptr]
         while next_ptr != t.idx:
             next_ptr = t.next_ptr
+            t = self.formula.terms[next_ptr]
 
         return t
 
