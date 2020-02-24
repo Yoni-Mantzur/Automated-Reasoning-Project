@@ -73,7 +73,8 @@ def test_satisfied(debug=True):
     formula = Formula.from_str(s)
     if debug:
         print('.. and got', formula)
-    assert formula.satisfied() == is_sat
+    assignment_all_true = {v: True for v in formula.var_equation_mapping.keys()}
+    assert formula.satisfied(assignment_all_true) == is_sat
 
 
 def test_literals():

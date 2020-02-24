@@ -204,7 +204,9 @@ class Formula(object):
     def __str__(self):
         formula = str(self.sat_formula)
         for literal, equation_idx in self.var_equation_mapping.items():
-            formula = formula.replace(str(literal), str(self.equations[equation_idx]))
+
+            equation = self.equations[equation_idx]
+            formula = formula.replace(str(literal), '{}={}'.format(str(equation.lhs), str(equation.rhs)))
         return formula
 
     def __repr__(self):
@@ -360,4 +362,4 @@ class Formula(object):
         # DEBUG - Sat formula is sat hence need to check smt formula
         print(partial_assignment)
         self.update_mappings(partial_assignment)
-        return self.satisfied()
+        return self.satisfied(partial_assignment)
