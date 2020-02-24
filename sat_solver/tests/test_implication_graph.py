@@ -1,4 +1,5 @@
 from itertools import count
+from typing import List
 
 import pytest
 
@@ -59,14 +60,14 @@ def test_first_uip_simple():
     assert actual_uip == expected_uip
 
 
-def test_first_uip_complicated():
-    vars = [Variable('x{}'.format(i + 1)) for i in range(10)]
-    pos_l = [None] + [Literal(v, negated=False) for v in vars]
-    neg_l = [None] + [Literal(v, negated=True) for v in vars]
+def get_complicated_graph() -> (ImplicationGraph, int, List[Variable]):
+    variables = [Variable('TEMP')] + [Variable('x{}'.format(i + 1)) for i in range(10)]
+    pos_l = [Literal(v, negated=False) for v in variables]
+    neg_l = [Literal(v, negated=True) for v in variables]
 
-    c0 = [pos_l[10]] # to stay aligned to the slides
+    c0 = [pos_l[10]]  # unused clause to keep the numbering aligned to the slides
     c1 = [pos_l[2], pos_l[3]]
-    c2 = [pos_l[9]]  # to stay aligned to the slides
+    c2 = [pos_l[9]]  # unused clause to keep the numbering aligned to the slides
     c3 = [neg_l[3], neg_l[4]]
     c4 = [neg_l[4], neg_l[2], neg_l[1]]
     c5 = [neg_l[6], neg_l[5], pos_l[4]]
@@ -74,16 +75,16 @@ def test_first_uip_complicated():
     c7 = [neg_l[8], pos_l[7], pos_l[6]]
     conflict = [c0, c1, c2, c3, c4, c5, c6, c7]
     # If we implement pure_literal will need to change this
-    # this is just to make sure the order decisions will be: x1=True, x2=True, x3=True, the conflict is because x1
-    n_temps = 4
-    temp_literals = [Literal(Variable('x1_temp{}'.format(idx)), negated=False) for idx in range(n_temps)]
-    x1_clauses = [[pos_l[1], l] for l in temp_literals]
-    temp_literals = [Literal(Variable('x8_temp{}'.format(idx)), negated=False) for idx in range(n_temps)]
-    x8_clauses = [[pos_l[8], l] for l in temp_literals[:-1]]
-    temp_literals = [Literal(Variable('x7_temp{}'.format(idx)), negated=False) for idx in range(n_temps)]
-    x7_clauses = [[neg_l[7], l] for l in temp_literals[:-2]]
 
-    clauses = conflict # + x1_clauses + x8_clauses + x7_clauses
+    # n_temps = 4
+    # temp_literals = [Literal(Variable('x1_temp{}'.format(idx)), negated=False) for idx in range(n_temps)]
+    # x1_clauses = [[pos_l[1], l] for l in temp_literals]
+    # temp_literals = [Literal(Variable('x8_temp{}'.format(idx)), negated=False) for idx in range(n_temps)]
+    # x8_clauses = [[pos_l[8], l] for l in temp_literals[:-1]]
+    # temp_literals = [Literal(Variable('x7_temp{}'.format(idx)), negated=False) for idx in range(n_temps)]
+    # x7_clauses = [[neg_l[7], l] for l in temp_literals[:-2]]
+
+    clauses = conflict  # + x1_clauses + x8_clauses + x7_clauses
     cnf = CnfFormula(clauses)
     cnf = preprocess(cnf)
 
@@ -97,10 +98,16 @@ def test_first_uip_complicated():
     g.add_node(3, pos_l[5], None, 6)
     g.add_node(3, pos_l[4], None, 5)
     g.add_node(3, neg_l[3], None, 3)
-    g.add_node(3, neg_l[2], None, 1)
+    g.add_node(3, neg_l[2], None, 4)
 
-    actual_uip = g.find_first_uip(4)
-    expected_uip = g._nodes[pos_l[4].variable]
+    return g, 1, variables
+
+
+def test_first_uip_complicated():
+    g, conflict_idx, variables = get_complicated_graph()
+
+    actual_uip = g.find_first_uip(conflict_idx)
+    expected_uip = g._nodes[variables[4]]
     assert actual_uip == expected_uip
 
 
@@ -150,13 +157,28 @@ def test_learn_conflict_simple():
     expected_conflict_clause = [neg_l[1], neg_l[3]]
     assert sorted(conflict_clause) == sorted(expected_conflict_clause)
 
+
+def test_learn_conflict_complicated():
+    g, conflict_idx, variables = get_complicated_graph()
+
+    conflict_clause = g.learn_conflict(Literal(variables[3], True), conflict_idx)
+    expected_conflict_clause = [Literal(variables[2], False), Literal(variables[4], True)]
+    assert sorted(conflict_clause) == sorted(expected_conflict_clause)
+
+    # actual_uip = g.find_first_uip(conflict_idx)
+    # expected_uip = g._nodes[variables[4]]
+    # assert actual_uip == expected_uip
+
+
 @pytest.fixture(autouse=True)
 def clean_counters():
     Node._ids = count(-1)
 
 
 if __name__ == "__main__":
+    test_learn_conflict_complicated()
     test_learn_conflict_simple()
+    test_first_uip_complicated()
     # Node._ids = count(-1)
     # test_find_all_paths()
     # test_first_uip_simple()
