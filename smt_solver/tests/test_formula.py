@@ -1,3 +1,5 @@
+import pytest
+
 from smt_solver.formula import Term, FunctionTerm, PureTerm, Formula
 
 
@@ -91,25 +93,9 @@ def test_literals():
                 assert formula.equations[equation_idx].fake_literals[not negated] in literals
 
 
-def test_simple():
-    f = Formula.from_str('((x=y&y=z)&~f(x)=f(z))')
-    print(f.sat_formula)
-    res = f.solve()
-    assert not res
-    f = Formula.from_str('((x=y&y=z)&f(x)=f(z))')
-    res = f.solve()
-    assert res
-
-def test_simple():
-    f = Formula.from_str('((g(a)=c&(~f(g(a))=f(c)|g(a)=d))&~c=d)')
-    print(f.sat_formula)
-    res = f.solve()
-    assert not res
-    # f = Formula.from_str('((x=y&y=z)&f(x)=f(z))')
-    # res = f.solve()
-    # assert res
-
 def test_propagation(debug=True):
+    pytest.skip()
+
     for s, before, after in [['((x=y&~f(x)=f(y))|~y=x)', {2: True}, False],
                              ['(x=y&f(x)=f(y))', {11: True}, {11: True, 16: True}],
                              ['(x=y&~f(x)=f(y))', {19: True}, {19: True, 24: False}],
@@ -134,26 +120,26 @@ def test_propagation(debug=True):
             assert after == res
 
 
-# def test_conflict(debug=True):
-#     for s, assignment, conflict in [['((x=y&~f(x)=f(y))|~y=x)', {38: True}, {43: False}],
-#                                     ['(x=y&~f(x)=f(y))', {47: True, 52: True}, {47: False, 52: False}],
-#                                     ['((x=y&~f(x)=f(y))|z=c)', {0: True, 1: True}, {0: False, 1: False}],
-#                                     ['((x=y&~f(x)=f(y))&z=c)', {0: True, 1: False}, []]]:
-#         if debug:
-#             print('Parsing', s, 'as a first-order formula...')
-#         formula = Formula.from_str(s)
-#         variables = list(formula.var_equation_mapping.keys())
-#         partial_assignment = {variables[v_idx]: value for v_idx, value in assignment.items()}
-#         if conflict:
-#             expected_conflict = [formula.equations[formula.var_equation_mapping[variables[v_idx]]].fake_literals[value]
-#                                  for v_idx, value in assignment.items()]
-#         else:
-#             expected_conflict = []
-#
-#         conflict = formula.conflict(partial_assignment)
-#
-#         assert expected_conflict == conflict
+def test_conflict(debug=True):
+    pytest.skip()
+    for s, assignment, conflict in [['((x=y&~f(x)=f(y))|~y=x)', {38: True}, {43: False}],
+                                    ['(x=y&~f(x)=f(y))', {47: True, 52: True}, {47: False, 52: False}],
+                                    ['((x=y&~f(x)=f(y))|z=c)', {0: True, 1: True}, {0: False, 1: False}],
+                                    ['((x=y&~f(x)=f(y))&z=c)', {0: True, 1: False}, []]]:
+        if debug:
+            print('Parsing', s, 'as a first-order formula...')
+        formula = Formula.from_str(s)
+        variables = list(formula.var_equation_mapping.keys())
+        partial_assignment = {variables[v_idx]: value for v_idx, value in assignment.items()}
+        if conflict:
+            expected_conflict = [formula.equations[formula.var_equation_mapping[variables[v_idx]]].fake_literals[value]
+                                 for v_idx, value in assignment.items()]
+        else:
+            expected_conflict = []
+
+        conflict = formula.conflict(partial_assignment)
+
+        assert expected_conflict == conflict
 
 if __name__ == '__main__':
-    test_simple()
-    # test_conflict()
+    test_conflict()

@@ -54,11 +54,12 @@ class Equation(object):
 
 class LpProgram(object):
     def __init__(self):
-        self.An = []
+        # Use data structures of revised simplex
+        self.An = [] #type: List[Equation]
         self.B = []
         self.Xb = []
         self.Xn = []
-        self.b = []
+        self.b = [] #type: List[float]
 
     def add_equation(self, equation: Union[Equation, str]) -> None:
         pass
