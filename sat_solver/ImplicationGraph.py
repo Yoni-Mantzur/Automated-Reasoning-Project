@@ -1,10 +1,11 @@
 from collections import defaultdict, OrderedDict
 from copy import copy
+from itertools import count
 from typing import List, Dict
 
 from sat_solver.cnf_formula import CnfFormula
 from sat_solver.sat_formula import Literal, Variable
-from itertools import count
+
 
 class Node(object):
     _ids = count(-1)
@@ -25,8 +26,8 @@ class Node(object):
         return hash(self.literal.variable)
 
     def __str__(self):
-
         return "{}:{}".format(str(self.literal), self.level)
+
 
 class Edge(object):
     def __init__(self, source: Node, target: Node, reason: int):
@@ -41,11 +42,13 @@ class Edge(object):
         self.target = target
         self.reason = reason
 
+
 class ImplicationGraph(object):
     def __init__(self, cnf_formula: CnfFormula):
         self._nodes = {}  # type: Dict[Variable, Node]
         self._edges = {}  # type: Dict[Node, List[Edge]]
-        self._incoming_edges = defaultdict(list) # type: Dict[Node, List[Edge]]
+        self._nodes_order = {}  # type: Dict[Variable, int]
+        self._incoming_edges = defaultdict(list)  # type: Dict[Node, List[Edge]]
         self._conflict_var = Literal(Variable('Conflict'), False)
         self._conflict_node = Node(self._conflict_var, -1)
         # self._nodes[self._conflict_var] = self._conflict_node
@@ -68,6 +71,7 @@ class ImplicationGraph(object):
         assert isinstance(literal, Literal)
         root_node = Node(literal, level)
         self._nodes[literal.variable] = root_node
+        self._nodes_order[root_node.literal.variable] = len(self._nodes.keys())
         self._edges[root_node] = []
         self._last_decide_node = root_node
 
@@ -80,6 +84,7 @@ class ImplicationGraph(object):
             reason_formula = self._formula.clauses[reason_idx]
         new_node = Node(literal, level)
         self._nodes[literal.variable] = new_node
+        self._nodes_order[new_node.literal.variable] = len(self._nodes.keys())
         self._edges[new_node] = []
 
         for reason_literal in reason_formula:
@@ -95,10 +100,10 @@ class ImplicationGraph(object):
     def find_last_assigned_literal(self, clause: List[Literal]) -> Literal:
         max_level = -1
         last_literal = None
-        for l in clause:
-            if self._nodes[l.variable].level > max_level:
-                last_literal = l
-                max_level = self._nodes[l.variable].level
+        for lit in clause:
+            if self._nodes_order[lit.variable] > max_level:
+                last_literal = lit
+                max_level = self._nodes_order[lit.variable]
         return last_literal
 
     def get_backjump_level(self, conflict_clause: List[Literal]) -> int:
@@ -121,10 +126,23 @@ class ImplicationGraph(object):
     @staticmethod
     def boolean_resolution(c1: List[Literal], c2: List[Literal], shared_var: Variable) -> List[Literal]:
         c = c1 + c2
-        return [l for l in c if l.variable != shared_var]
+        return list(set(l for l in c if l.variable != shared_var))
 
     def get_decision_levels(self, clause: List[Literal]):
         return [self._nodes[lit.variable].level for lit in clause if lit.variable in self._nodes]
+
+    def is_two_literals_in_level(self, level: int, clause: List[Literal]) -> bool:
+        '''
+        Check whether there are two literals in the clause that come from the given decision_level
+        '''
+        found_first = False
+        for lit in clause:
+            if self._nodes[lit.variable].level == level:
+                if found_first:
+                    return True
+                else:
+                    found_first = True
+        return False
 
     def learn_conflict(self, last_assigned: Literal, formula_idx: int) -> List[Literal]:
         # add the conflict node
@@ -132,6 +150,7 @@ class ImplicationGraph(object):
         if first_uip is None:
             return []
         uip_negate = copy(first_uip.literal).negate()
+        uip_level = first_uip.level
         node = self._nodes[last_assigned.variable]
         c = self._formula.clauses[formula_idx]
         if not self._incoming_edges[node]:
@@ -142,13 +161,14 @@ class ImplicationGraph(object):
             shared_var = node.literal.variable
             clause_on_edge = self._formula.clauses[self._incoming_edges[node][-1].reason]  # c' in the slides
             new_clause = self.boolean_resolution(c, clause_on_edge, shared_var)
-            if uip_negate in new_clause:
+            if uip_negate in new_clause and not self.is_two_literals_in_level(uip_level, new_clause):
                 return new_clause
 
             c = new_clause
             # TODO: The presentation (lec 3 slide 29) says to pick the next node as one of the incoming to the new_clause
             # but that might create a loop (as in test_learn_conflict_simple case 2)
-            node = self._nodes[self.find_last_assigned_literal(clause_on_edge).variable]
+            # node = self._nodes[self.find_last_assigned_literal(clause_on_edge).variable]
+            node = self._nodes[self.find_last_assigned_literal(c).variable]
 
     def find_first_uip(self, formula_idx: int) -> Node:
         if self._last_decide_node is None:

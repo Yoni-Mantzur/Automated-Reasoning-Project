@@ -138,11 +138,11 @@ def test_learn_conflict_simple():
     g, conflict_idx, variables = get_simple_graph()
 
     conflict_clause = g.learn_conflict(Literal(variables[3], False), conflict_idx)
-    expected_conflict_clause = [Literal(variables[1], True), Literal(variables[2], True)]
+    expected_conflict_clause = [Literal(variables[1], True)]
     assert sorted(conflict_clause) == sorted(expected_conflict_clause)
 
     conflict_clause = g.learn_conflict(Literal(variables[2], True), conflict_idx)
-    expected_conflict_clause = [Literal(variables[1], True), Literal(variables[3], True)]
+    expected_conflict_clause = [Literal(variables[1], True)]
     assert sorted(conflict_clause) == sorted(expected_conflict_clause)
 
 
@@ -150,7 +150,7 @@ def test_learn_conflict_complicated():
     g, conflict_idx, variables = get_complicated_graph()
 
     conflict_clause = g.learn_conflict(Literal(variables[3], True), conflict_idx)
-    expected_conflict_clause = [Literal(variables[2], False), Literal(variables[4], True)]
+    expected_conflict_clause = [Literal(variables[1], True), Literal(variables[4], True)]
     assert sorted(conflict_clause) == sorted(expected_conflict_clause)
 
     # actual_uip = g.find_first_uip(conflict_idx)
@@ -172,7 +172,7 @@ def test_backjump_complicated():
 
     conflict_clause = g.learn_conflict(Literal(variables[3], True), conflict_idx)
     level = g.get_backjump_level(conflict_clause)
-    expected_level = 0
+    expected_level = 1
     assert level == expected_level
 
 @pytest.fixture(autouse=True)
