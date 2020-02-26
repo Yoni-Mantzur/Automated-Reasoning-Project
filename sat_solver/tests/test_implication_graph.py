@@ -124,7 +124,7 @@ def test_boolean_resolution():
     c1 = [neg_l[4], neg_l[3]]
     c_tag = ImplicationGraph.boolean_resolution(c0, c1, pos_l[3].variable)
     expected_c_tag = [pos_l[2], neg_l[4]]
-    assert c_tag == expected_c_tag
+    assert sorted(c_tag) == sorted(expected_c_tag)
 
     c0 = [pos_l[2], neg_l[3], neg_l[5]]
     c1 = [neg_l[4], pos_l[3], pos_l[1]]
