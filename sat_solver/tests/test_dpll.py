@@ -141,25 +141,34 @@ def test_search_complex():
 
 
 def test_search_complex_unsat():
-    pytest.skip()
-    x1_var = Variable('x1')
-    x2_var = Variable('x2')
-    x3_var = Variable('x3')
-    x4_var = Variable('x4')
+    variables = [Variable('TEMP')] + [Variable('x{}'.format(i + 1)) for i in range(10)]
+    pos_l = [Literal(v, negated=False) for v in variables]
+    neg_l = [Literal(v, negated=True) for v in variables]
 
-    x1 = Literal(x1_var, negated=False)
-    not_x1 = Literal(x1_var, negated=True)
-    x2 = Literal(x2_var, negated=False)
-    not_x2 = Literal(x2_var, negated=True)
-    x3 = Literal(x3_var, negated=False)
-    not_x3 = Literal(x3_var, negated=True)
-    x4 = Literal(x4_var, negated=False)
-    not_x4 = Literal(x4_var, negated=True)
+    # x1_var = Variable('x1')
+    # x2_var = Variable('x2')
+    # x3_var = Variable('x3')
+    # x4_var = Variable('x4')
+    #
+    # x1 = Literal(x1_var, negated=False)
+    # not_x1 = Literal(x1_var, negated=True)
+    # x2 = Literal(x2_var, negated=False)
+    # not_x2 = Literal(x2_var, negated=True)
+    # x3 = Literal(x3_var, negated=False)
+    # not_x3 = Literal(x3_var, negated=True)
+    # x4 = Literal(x4_var, negated=False)
+    # not_x4 = Literal(x4_var, negated=True)
 
-    # TODO: This case breaks sometimes because there is no specific order on the assignments
+    # n_temps = 4
+    # temp_literals = [Literal(Variable('x1_temp{}'.format(idx)), negated=False) for idx in range(n_temps)]
+    # x1_clauses = [[pos_l[1], l] for l in temp_literals]
 
     # x1 = T, x2 = F, x3 =
-    clauses = [[not_x1, x2, not_x3], [x3, not_x2, x1], [x1, x2], [not_x1, not_x2], [x3, x2], [not_x3, not_x2]]
+    # x3 != x2 /\ x1 != x2 /\ (!x1 \/ x2 \/ !x3) /\ (x1 \/ !x2 \/ x3)
+    clauses = [[pos_l[1], pos_l[2]], [neg_l[1], neg_l[2]],
+               [pos_l[3], pos_l[2]], [neg_l[3], neg_l[2]],
+               [neg_l[1], pos_l[2], neg_l[3]], [pos_l[3], neg_l[2], pos_l[1]]]
+
     cnf = CnfFormula(clauses)
     cnf = preprocess(cnf)
     dpll = DPLL(cnf)

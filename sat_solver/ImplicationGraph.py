@@ -1,7 +1,7 @@
 from collections import defaultdict, OrderedDict
 from copy import copy
 from itertools import count
-from typing import List, Dict
+from typing import List, Dict, Set
 
 from sat_solver.cnf_formula import CnfFormula
 from sat_solver.sat_formula import Literal, Variable
@@ -48,17 +48,24 @@ class ImplicationGraph(object):
         self._nodes = {}  # type: Dict[Variable, Node]
         self._edges = {}  # type: Dict[Node, List[Edge]]
         self._nodes_order = {}  # type: Dict[Variable, int]
+        self._level_to_nodes = defaultdict(set)  # type: Dict[int, Set[Variable]]
         self._incoming_edges = defaultdict(list)  # type: Dict[Node, List[Edge]]
         self._conflict_var = Literal(Variable('Conflict'), False)
         self._conflict_node = Node(self._conflict_var, -1)
-        # self._nodes[self._conflict_var] = self._conflict_node
+        # self._nodes[self._confliroot_node.literal.variablect_var] = self._conflict_node
         self._last_decide_node = None
         self._formula = cnf_formula
         # self.edges[0] = []
 
     def remove_level(self, level):
         # TODO: Implement if needed
-        pass
+        for v in self._level_to_nodes[level]:
+            n = self._nodes[v]
+            for e in self._edges[n]:
+                self._incoming_edges[e.target].remove(e)
+            del self._edges[n]
+            del self._nodes[v]
+
 
     def add_decide_node(self, level, literal) -> None:
         '''
@@ -71,7 +78,9 @@ class ImplicationGraph(object):
         assert isinstance(literal, Literal)
         root_node = Node(literal, level)
         self._nodes[literal.variable] = root_node
+
         self._nodes_order[root_node.literal.variable] = len(self._nodes.keys())
+        self._level_to_nodes[level].add(root_node.literal.variable)
         self._edges[root_node] = []
         self._last_decide_node = root_node
 
@@ -86,7 +95,7 @@ class ImplicationGraph(object):
         self._nodes[literal.variable] = new_node
         self._nodes_order[new_node.literal.variable] = len(self._nodes.keys())
         self._edges[new_node] = []
-
+        self._level_to_nodes[level].add(new_node.literal.variable)
         for reason_literal in reason_formula:
             reason_variable = reason_literal.variable
             assert isinstance(reason_variable, Variable)
