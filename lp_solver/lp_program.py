@@ -63,6 +63,8 @@ class Equation(object):
     def __str__(self):
         units_str = ''
         for v, c in self.units.items():
+
+            # TODO: should we need c==0?
             if c != 0:
                 sign = ('+' if c > 0 else '')
                 units_str += '%s%.2fx%d' % (sign, c, v)
