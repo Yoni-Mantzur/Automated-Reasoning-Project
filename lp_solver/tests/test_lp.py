@@ -28,6 +28,7 @@ def test_initialize():
     assert np.array_equal(lp.Cb, objective_basic)
     assert np.array_equal(lp.Cn, objective_non_basic)
     lp.dump()
+    print(lp)
 
 if __name__ == "__main__":
     test_initialize()

@@ -142,15 +142,16 @@ class LpProgram(object):
             self.b = np.append(self.b, equation.scalar)
 
         # Create the basic variables
-        self.Xb = list(range(n, n + m))
+        self.Xb = np.arange(n, n + m)
         self.B = np.eye(len(self.Xb))
 
     def __str__(self):
-        return 'B: \n %s\n Xb: \n %s\n' \
-               'An: \n %s\n Xn: \n %s\n' \
-               'Cb: \n %s\n Cn: \n %s\n' \
-               'b: \n %s\n' \
-               % (str(self.B), str(self.Xb), str(self.An), str(self.Xn), str(self.Cb), str(self.Cn), str(self.b))
+        return 'B (shape=%s): \n %s\nXb (shape=%s): \n %s\n' \
+               'An (shape=%s): \n %s\nXn (shape=%s): \n %s\n' \
+               'Cb (shape=%s): \n %s\nCn (shape=%s): \n %s\n' \
+               'b (shape=%s): \n %s\n' \
+               % (self.B.shape, self.B, self.Xb.shape, self.Xb, self.An.shape, self.An, self.Xn.shape, self.Xn,
+                  self.Cb.shape, self.Cb, self.Cn.shape, self.Cn, self.b.shape, self.b)
 
     def dump(self):
         print("Lp program:")
