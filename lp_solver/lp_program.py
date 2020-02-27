@@ -13,51 +13,52 @@ class Equation(object):
 
     TYPES = tuple(t.value for t in Type)
 
-    def __init__(self, units: Dict[int, float] = None, type: Type = None, scalar = None):
+    def __init__(self, units: Dict[int, float] = None, type_equation: Type = None, scalar: float = None):
         self.units = units or {}
-        self.type = type
+        self.type = type_equation
         self.max_variable_index = -1
         self.scalar = scalar
 
     @staticmethod
-    def unit_from_str(unit: str) -> Tuple[float, int]:
+    def unit_from_str(unit: str) -> Tuple[int, float]:
         split_unit = unit.split('x')
         assert len(split_unit) == 2
         c, v = split_unit if split_unit[0] else [1, split_unit[1]]
         return int(v), float(c)
 
-    @staticmethod
-    def from_str(equation_str: str) -> 'Equation':
-        equation = Equation()
-        max_index = -1
-        # Most of the equations will be 2x1,3x2>=2, but the objective will be just 2x1,3x2
-        if any([t.value in equation_str for t in Equation.Type]):
-            r = '(.*?)(>=|<=|=)(-?[0-9]*$)'.format('|'.join([t.value for t in Equation.Type]))
-            groups = re.search(r,equation_str)
-            lhs = groups[1]
-            t = groups[2]
-            rhs = groups[3]
-            equation.type = Equation.Type(t)
-            equation.scalar = int(rhs)
-        else:
-            lhs = equation_str
+    def parse_lhs(self, lhs: str):
+        # Parse left side
         units = lhs.split(',')
         for unit in units:
-            unit = unit.strip()
-            if True:
-                v, c = Equation.unit_from_str(unit)
-                equation.units[v] = c
-                if v > max_index:
-                    max_index = v
+            v, c = Equation.unit_from_str(unit.strip())
+            self.units[v] = c
 
-        equation.max_variable_index = max_index
+        self.max_variable_index = max(self.units.keys())
+
+    def from_str(self, equation_str: str) -> None:
+        r = '(.*?)({})(-?[0-9]+$)'.format('|'.join(Equation.TYPES))
+        lhs, t, rhs = re.search(r, equation_str).groups()
+
+        self.parse_lhs(lhs)
+        self.type = Equation.Type(t)
+        self.scalar = int(rhs)
+
         # TODO: Turn into normal form, i.e. transform the types into LE
-        return equation
+
+    @staticmethod
+    def get_equation(equation_str: str) -> 'Equation':
+        eq = Equation()
+        eq.from_str(equation_str)
+        return eq
+
+    @staticmethod
+    def get_expression(expression: str) -> 'Equation':
+        eq = Equation()
+        eq.parse_lhs(expression)
+        return eq
 
     def __str__(self):
-        return '%s %s 0' % (
-            ' '.join(['%fx%d' % (c, v) for v, c in self.units.items()]),
-            self.type.value)
+        return '%s %s %f' % (' '.join(['%fx%d' % (c, v) for v, c in self.units.items()]), self.type.value, self.scalar)
 
     def __repr__(self):
         return 'Equation(%s)'
@@ -66,7 +67,7 @@ class Equation(object):
         return hash(self.units) + hash(self.type)
 
     def __eq__(self, other):
-        return str(self) == str(other)
+        return self.units == other.units and self.type == other.type and self.scalar == other.scalar
 
 
 class LpProgram(object):
@@ -89,22 +90,24 @@ class LpProgram(object):
         self.Cn = None
         self._create_objective(objective)
 
-    def _create_objective(self, equation: Union[Equation, str]):
-        if isinstance(equation, str):
-            equation = Equation.from_str(equation)
+    def _create_objective(self, objective: Union[Equation, str]):
+        if isinstance(objective, str):
+            objective = Equation.get_expression(objective)
+
         self.Cb = np.zeros(shape=len(self.Xb))
         self.Cn = np.zeros(shape=len(self.Xn))
 
-        for v, c in equation.units.items():
+        for v, c in objective.units.items():
             assert v <= len(self.Cn), "There is an unbounded variable"
             self.Cn[v] = c
 
     def _add_equations(self, equations: List[Union[Equation, str]]) -> None:
         n = -1  # Number of variables
         m = len(equations)  # Number of equations
+
         for i, equation in enumerate(equations):
             if isinstance(equation, str):
-                equation = Equation.from_str(equation)
+                equation = Equation.get_equation(equation)
             assert isinstance(equation, Equation)
             equations[i] = equation
 
@@ -113,9 +116,8 @@ class LpProgram(object):
 
         self.An = np.zeros(shape=(m, n))
         for i, equation in enumerate(equations):
-            cur_equation = np.zeros(shape=(n))
+            cur_equation = np.zeros(shape=(n,))
             for variable, coefficient in equation.units.items():
-                # TODO: Can Xn be a set?
                 if variable not in self.Xn:
                     self.Xn.append(variable)
                 assert variable < cur_equation.shape[0]
@@ -124,6 +126,7 @@ class LpProgram(object):
             # Add row
             self.An[i, :] = cur_equation
             self.b.append(equation.scalar)
+
         # Create the basic variables
         self.Xb = list(range(n, n + m))
         self.B = np.eye(len(self.Xb))
