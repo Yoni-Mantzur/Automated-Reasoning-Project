@@ -15,7 +15,7 @@ def test_initialize():
 
     lp = LpProgram(matrix_str, objective_str)
     assert np.array_equal(lp.An, matrix)
-    assert lp.b == [-1, 2, 0]
+    assert np.array_equal(lp.b, [-1, 2, 0])
     assert sorted(lp.Xn) == sorted(non_basic_variables)
 
     basic_variables = [4, 5, 6]
@@ -27,7 +27,7 @@ def test_initialize():
     objective_basic = np.zeros(shape=len(basic_variables))
     assert np.array_equal(lp.Cb, objective_basic)
     assert np.array_equal(lp.Cn, objective_non_basic)
-
+    lp.dump()
 
 if __name__ == "__main__":
     test_initialize()

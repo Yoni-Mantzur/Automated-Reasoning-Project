@@ -13,7 +13,7 @@ class Equation(object):
 
     TYPES = tuple(t.value for t in Type)
 
-    def __init__(self, units: Dict[int, float] = None, type_equation: Type = None, scalar: float = None):
+    def __init__(self, units: Dict[int, float] = None, type_equation: Type = Type.LE, scalar: float = None):
         self.units = units or {}
         self.type = type_equation
         self.max_variable_index = -1
@@ -31,7 +31,10 @@ class Equation(object):
         units = lhs.split(',')
         for unit in units:
             v, c = Equation.unit_from_str(unit.strip())
-            self.units[v] = c
+
+            # TODO: should we leave 0 coef?
+            if c != 0:
+                self.units[v] = c
 
         self.max_variable_index = max(self.units.keys())
 
@@ -58,10 +61,19 @@ class Equation(object):
         return eq
 
     def __str__(self):
-        return '%s %s %f' % (' '.join(['%fx%d' % (c, v) for v, c in self.units.items()]), self.type.value, self.scalar)
+        units_str = ''
+        for v, c in self.units.items():
+            if c != 0:
+                sign = ('+' if c > 0 else '')
+                units_str += '%s%.2fx%d' % (sign, c, v)
+
+        if self.scalar:
+            return '%s %s %.2f' % (units_str, self.type.value, self.scalar)
+
+        return units_str
 
     def __repr__(self):
-        return 'Equation(%s)'
+        return 'Equation(%s)' % str(self)
 
     def __hash__(self):
         return hash(self.units) + hash(self.type)
@@ -73,15 +85,15 @@ class Equation(object):
 class LpProgram(object):
     def __init__(self, equations: List[Union[Equation, str]], objective: Union[Equation, str]):
         # Basis, coefficients and variables
-        self.B = np.array([[]])  # type: np.array
-        self.Xb = []  # type: List[int]
+        self.B = np.array([[]])  # type: np.ndarray
+        self.Xb = np.array([])  # type: np.ndarray
 
         # Non-basic coefficients and variables
-        self.An = np.array([[]])  # type: np.array
-        self.Xn = []  # type: List[int]
+        self.An = np.array([[]])  # type: np.ndarray
+        self.Xn = np.array([])  # type: np.ndarray
 
         # constraints scalars
-        self.b = []  # type: List[float]
+        self.b = np.array([])  # type: np.ndarray
 
         self._add_equations(equations)
 
@@ -119,14 +131,42 @@ class LpProgram(object):
             cur_equation = np.zeros(shape=(n,))
             for variable, coefficient in equation.units.items():
                 if variable not in self.Xn:
-                    self.Xn.append(variable)
+                    self.Xn = np.append(self.Xn, variable)
                 assert variable < cur_equation.shape[0]
                 cur_equation[variable] = coefficient
 
             # Add row
             self.An[i, :] = cur_equation
-            self.b.append(equation.scalar)
+            self.b = np.append(self.b, equation.scalar)
 
         # Create the basic variables
         self.Xb = list(range(n, n + m))
         self.B = np.eye(len(self.Xb))
+
+    def __str__(self):
+        return 'B: \n %s\n Xb: \n %s\n' \
+               'An: \n %s\n Xn: \n %s\n' \
+               'Cb: \n %s\n Cn: \n %s\n' \
+               'b: \n %s\n' \
+               % (str(self.B), str(self.Xb), str(self.An), str(self.Xn), str(self.Cb), str(self.Cn), str(self.b))
+
+    def dump(self):
+        print("Lp program:")
+        print('*'*100)
+
+        print("Equations:")
+        variables = np.append(self.Xn, self.Xn)
+        for i, coefs in enumerate(np.append(self.An, self.B, axis=1)):
+            units = {c: v for c, v in zip(variables, coefs)}
+            scalar = self.b[i]
+            print(str(Equation(units=units, scalar=scalar)))
+
+        print("Objective:")
+        variables = np.append(self.Xn, self.Xb)
+        coefs = np.append(self.Cn, self.Cb)
+        units = {c: v for c, v in zip(variables, coefs)}
+
+        print(str(Equation(units)))
+        print('*'*100)
+
+
