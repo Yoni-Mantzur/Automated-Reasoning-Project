@@ -1,7 +1,15 @@
+from itertools import count
+
 import pytest
 
+from sat_solver.sat_formula import Literal
 from smt_solver.formula import Term, FunctionTerm, PureTerm, Formula
 
+
+@pytest.fixture(autouse=True)
+def reset_counter():
+    from sat_solver.sat_formula import Variable
+    Variable._ids = count(0)
 
 def test_term_str(debug=True):
     if debug:
@@ -21,7 +29,7 @@ def test_term_from_str(debug=True):
 
 
 def test_formula_from_str(debug=True):
-    for s in ['~q(x)=x', '((x=y|x=z)&(~x=y|z=r))', '~r(r(x))=x', '(a=a|a=a)', '(r(x)=x|q(y)=y)', '(a=a&x=x)',
+    for s in ['(q(x)=x->q(y)=y)', '(q(x)=x<->q(y)=y)', '~q(x)=x', '((x=y|x=z)&(~x=y|z=r))', '~r(r(x))=x', '(a=a|a=a)', '(r(x)=x|q(y)=y)', '(a=a&x=x)',
               '((r(x)=x&x=a)|q(x)=a)', 'r(r(x),y)=x', 'plus(s(x),y,s(plus(x,y)))=x', 'r(x8,x7,c)=a', 'r(x,y)=x']:
         if debug:
             print('Parsing', s, 'as a first-order formula...')
@@ -94,46 +102,36 @@ def test_literals():
 
 
 def test_propagation(debug=True):
-    pytest.skip()
-
-    for s, before, after in [['((x=y&~f(x)=f(y))|~y=x)', {2: True}, False],
-                             ['(x=y&f(x)=f(y))', {11: True}, {11: True, 16: True}],
-                             ['(x=y&~f(x)=f(y))', {19: True}, {19: True, 24: False}],
-                             ['((x=y&~f(x)=f(y))|z=c)', {27: True}, {27: True, 32: False}]]:
+    for s, before, after in [['(x=y&~f(x)=f(y))', {0: True, 1: False}, {}],
+                             ['(x=y&f(x)=f(y))', {2: True}, {3: True}],
+                             ['(x=y&~f(x)=f(y))', {4: True}, {5: True}],
+                             ['((~x=y&~f(x)=f(y))|z=c)', {6: False}, {}],
+                             ['((x=y&~f(x)=f(y))|z=c)', {}, None]]:
 
         if debug:
             print('Parsing', s, 'as a first-order formula...')
         formula = Formula.from_str(s)
-        partial_assignment = {formula.equations[v_idx].fake_variable: value for v_idx, value in before.items()}
-        if type(after) == bool:
-            expected_assignment = after
-        else:
-            expected_assignment = {formula.equations[v_idx].fake_variable: value for v_idx, value in after.items()}
+        variables = {v.idx: formula.equations[eq].fake_variable for v, eq in formula.var_equation_mapping.items()}
+        partial_assignment = {variables[v_idx]: value for v_idx, value in before.items()}
+        expected_assignment = {variables[v_idx]: value for v_idx, value in after.items()} if after is not None else None
 
         res = formula.propagate(partial_assignment)
 
-        if type(after) == dict:
-            assert res
-            assert partial_assignment == expected_assignment
-
-        else:
-            assert after == res
+        assert res == expected_assignment
 
 
 def test_conflict(debug=True):
-    pytest.skip()
-    for s, assignment, conflict in [['((x=y&~f(x)=f(y))|~y=x)', {38: True}, {43: False}],
-                                    ['(x=y&~f(x)=f(y))', {47: True, 52: True}, {47: False, 52: False}],
-                                    ['((x=y&~f(x)=f(y))|z=c)', {0: True, 1: True}, {0: False, 1: False}],
-                                    ['((x=y&~f(x)=f(y))&z=c)', {0: True, 1: False}, []]]:
+
+    for s, assignment, conflict in [['(x=y&~f(x)=f(y))', {0: True, 1: False}, {0: False, 1: True}],
+                                    ['((x=y&~f(x)=f(y))&f(x)=f(y))', {2: True, 3: False}, {2: False, 3: True}],
+                                    ['((x=y&~f(x)=f(y))&z=c)', {5: True, 6: True}, []]]:
         if debug:
             print('Parsing', s, 'as a first-order formula...')
         formula = Formula.from_str(s)
-        variables = list(formula.var_equation_mapping.keys())
+        variables = {v.idx: formula.equations[eq].fake_variable for v, eq in formula.var_equation_mapping.items()}
         partial_assignment = {variables[v_idx]: value for v_idx, value in assignment.items()}
         if conflict:
-            expected_conflict = [formula.equations[formula.var_equation_mapping[variables[v_idx]]].fake_literals[value]
-                                 for v_idx, value in assignment.items()]
+            expected_conflict = [Literal(variables[v_idx], value) for v_idx, value in assignment.items()]
         else:
             expected_conflict = []
 

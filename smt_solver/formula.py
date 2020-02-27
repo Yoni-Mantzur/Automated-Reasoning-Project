@@ -185,6 +185,8 @@ class EquationTerm(Term):
     def __repr__(self):
         return 'EquationTerm(%s)' % str(self)
 
+    def get_str_original(self) -> str:
+        return '%s=%s' % (str(self.lhs), str(self.rhs))
 
 class Formula(object):
     def __init__(self):
@@ -221,8 +223,9 @@ class Formula(object):
             # Binary case
             if raw_formula[0] == '(':
                 left, s = from_str_helper(raw_formula[1:])
-                op = Operator(s[0])
-                right, s = from_str_helper(s[1:])
+                op_match = re.search(binary_operator_pattern, s)
+                op = Operator(s[:op_match.end()])
+                right, s = from_str_helper(s[op_match.end():])
                 return SatFormula(left, right, op), s[1:]
 
             # Unary case
@@ -247,6 +250,7 @@ class Formula(object):
         formula = Formula()
         formula.sat_formula = from_str_helper(raw_formula)[0]
         formula.set_literals()
+        print(formula)
         return formula
 
     def update_equations(self, equation: EquationTerm) -> EquationTerm:
@@ -310,18 +314,22 @@ class Formula(object):
             conflict.append(literal)
         return conflict
 
-    def propagate(self, partial_assignment: Dict[Variable, bool]) -> Dict[Variable, bool]:
+    def propagate(self, partial_assignment: Dict[Variable, bool]) -> Optional[Dict[Variable, bool]]:
         '''
         Checks if the partial assignment is valid, if so, extend the assignment (propagation) and return True
         otherwise, return False
         '''
         from smt_solver.algorithms import CongruenceClosureAlgorithm
-        assignments = {}
         self.update_mappings(partial_assignment)
+
+        if not self.equalities and not self.inequalities:
+            return None
+
         classes_algorithm = CongruenceClosureAlgorithm(self)
 
+        assignments = {}
         if not classes_algorithm.is_legal_sets():
-            return {}
+            return assignments
 
         for var, equation_idx in self.var_equation_mapping.items():
             non_assigned_var = var not in partial_assignment
@@ -340,7 +348,17 @@ class Formula(object):
 
         return assignments
 
-    def solve(self) -> bool:
+    def transfer_assignment(self, partial_assignment: Dict[Variable, bool]) -> Dict[str, bool]:
+        assignment = {}
+        for v, val in partial_assignment.items():
+
+            if v in self.var_equation_mapping:
+                equation = self.equations[self.var_equation_mapping[v]]
+                assignment.update({equation: val})
+
+        return {eq.get_str_original(): val for eq, val in assignment.items()}
+
+    def solve(self) -> Tuple[bool, Optional[Dict[str, bool]]]:
         from sat_solver.preprocessor import preprocess_from_sat
         cnf_formula = preprocess_from_sat(self.sat_formula)
         dpll_algorithm = DPLL(cnf_formula, propagate_helper=self.propagate, conflict_helper=self.conflict)
@@ -350,11 +368,9 @@ class Formula(object):
 
         # Sat formula is unsat hence, smt formula is ussat
         if not is_sat:
-            return False
+            return False, None
 
         partial_assignment = dpll_algorithm.get_partial_assignment()
+        assignment = self.transfer_assignment(partial_assignment)
+        return self.satisfied(partial_assignment), assignment
 
-        # DEBUG - Sat formula is sat hence need to check smt formula
-        print(partial_assignment)
-        self.update_mappings(partial_assignment)
-        return self.satisfied(partial_assignment)

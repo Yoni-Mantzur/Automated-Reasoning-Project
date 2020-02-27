@@ -12,7 +12,7 @@ from sat_solver.sat_formula import Literal, Variable
 class DPLL(object):
     def __init__(self, cnf_formula: CnfFormula, partial_assignment=None, watch_literals=None, implication_graph=None,
                  is_first_run=True,
-                 propagate_helper: Callable[[Dict[Variable, bool]], Dict[Variable, bool]] = None,
+                 propagate_helper: Callable[[Dict[Variable, bool]], Optional[Dict[Variable, bool]]] = None,
                  conflict_helper:  Callable[[Dict[Variable, bool]], List[Literal]] = None):
         self._assignment = partial_assignment or [{}]
         self.watch_literals = watch_literals or defaultdict(list)
@@ -247,27 +247,31 @@ class DPLL(object):
 
         self.check_theory_conflict()
         if self.propagate_helper:
+
             smt_res = self.propagate_helper(self._assignment[-1])
-            self._assignment[-1].update(smt_res)
-            print(self._assignment[-1])
-            for variable, val in smt_res.items():
-                if val:
-                    lit = Literal(variable, False)
-                else:
-                    lit = Literal(variable, True)
+            # smt_res will be None if partial_assignment is empty
+            if smt_res is not None:
+                self._assignment[-1].update(smt_res)
+                print(self._assignment[-1])
+                for variable, val in smt_res.items():
+                    if val:
+                        lit = Literal(variable, False)
+                    else:
+                        lit = Literal(variable, True)
 
-                if not self.remove_clauses_by_assignment(lit):
-                    self.formula.clauses = [[]]
-                    return self.formula
-            # if not self.remove_clauses_by_assignment(lit):
-            #     self.formula.clauses = [[]]
-            #     return self.formula
+                    if not self.remove_clauses_by_assignment(lit):
+                        self.formula.clauses = [[]]
+                        return self.formula
+                # if not self.remove_clauses_by_assignment(lit):
+                #     self.formula.clauses = [[]]
+                #     return self.formula
 
-            print(self._assignment[-1])
-            print("*"*100)
-            if not smt_res:
-                # Conflict
-                return False
+                print(self._assignment[-1])
+                print("*"*100)
+
+                if not smt_res:
+                    # Conflict
+                    return False
 
         next_decision_lit = self.decision_heuristic()
         assert isinstance(next_decision_lit, Literal)
