@@ -28,6 +28,8 @@ class Node(object):
     def __str__(self):
         return "{}:{}".format(str(self.literal), self.level)
 
+    def __repr__(self):
+        return str(self)
 
 class Edge(object):
     def __init__(self, source: Node, target: Node, reason: int):
@@ -42,6 +44,11 @@ class Edge(object):
         self.target = target
         self.reason = reason
 
+    def __str__(self):
+        return "{} -> {} ({})".format(self.source, self.target, self.reason)
+
+    def __repr__(self):
+        return str(self)
 
 class ImplicationGraph(object):
     def __init__(self, cnf_formula: CnfFormula):
@@ -52,20 +59,22 @@ class ImplicationGraph(object):
         self._incoming_edges = defaultdict(list)  # type: Dict[Node, List[Edge]]
         self._conflict_var = Literal(Variable('Conflict'), False)
         self._conflict_node = Node(self._conflict_var, -1)
-        # self._nodes[self._confliroot_node.literal.variablect_var] = self._conflict_node
         self._last_decide_node = None
         self._formula = cnf_formula
-        # self.edges[0] = []
 
     def remove_level(self, level):
-        # TODO: Implement if needed
         for v in self._level_to_nodes[level]:
             n = self._nodes[v]
             for e in self._edges[n]:
                 self._incoming_edges[e.target].remove(e)
             del self._edges[n]
             del self._nodes[v]
-
+        # Remove also all edges to conflict, might be that we backjump to level 11 but the conflict involved something
+        # from level 10
+        for e in self._incoming_edges[self._conflict_node]:
+            if e.source in self._edges and e in self._edges[e.source]:
+                self._edges[e.source].remove(e)
+        del self._level_to_nodes[level]
 
     def add_decide_node(self, level, literal) -> None:
         '''
@@ -110,7 +119,7 @@ class ImplicationGraph(object):
         max_level = -1
         last_literal = None
         for lit in clause:
-            if self._nodes_order[lit.variable] > max_level:
+            if self._nodes_order[lit.variable] > max_level and lit.variable in self._nodes:
                 last_literal = lit
                 max_level = self._nodes_order[lit.variable]
         return last_literal
@@ -161,26 +170,26 @@ class ImplicationGraph(object):
         uip_negate = copy(first_uip.literal).negate()
         uip_level = first_uip.level
         node = self._nodes[last_assigned.variable]
-        c = self._formula.clauses[formula_idx]
+        clause = self._formula.clauses[formula_idx]
         if not self._incoming_edges[node]:
             # No incoming edges to the node, can't resolve the conflict
-            return c
-        # conflict clause
-        while True:
+            return clause
+
+        # clause = c
+        while uip_negate in clause and not self.is_two_literals_in_level(uip_level, clause):
             shared_var = node.literal.variable
             clause_on_edge = self._formula.clauses[self._incoming_edges[node][-1].reason]  # c' in the slides
-            new_clause = self.boolean_resolution(c, clause_on_edge, shared_var)
-            if uip_negate in new_clause and not self.is_two_literals_in_level(uip_level, new_clause):
-                return new_clause
-
-            c = new_clause
+            clause = self.boolean_resolution(clause, clause_on_edge, shared_var)
             # TODO: The presentation (lec 3 slide 29) says to pick the next node as one of the incoming to the new_clause
             # but that might create a loop (as in test_learn_conflict_simple case 2)
             # node = self._nodes[self.find_last_assigned_literal(clause_on_edge).variable]
-            node = self._nodes[self.find_last_assigned_literal(c).variable]
+
+            node = self._nodes[self.find_last_assigned_literal(clause).variable]
+        return clause
+
 
     def find_first_uip(self, formula_idx: int) -> Node:
-        if self._last_decide_node is None:
+        if self._last_decide_node is None or formula_idx >= len(self._formula.clauses):
             return None
         for lit in self._formula.clauses[formula_idx]:
             if lit.variable not in self._nodes:
@@ -221,3 +230,14 @@ class ImplicationGraph(object):
 
         _find_all_path_rec(source, target, partial_paths)
         return partial_paths[target.id]
+
+    def __str__(self):
+        s = ""
+        for n in self._nodes_order:
+            # if n in self._nodes:
+            node = self._nodes[n] if n in self._nodes else None
+            if node in self._edges:
+                s += "{}: {}\n".format(n, self._edges[node])
+
+
+        return s

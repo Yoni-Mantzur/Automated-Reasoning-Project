@@ -153,6 +153,8 @@ class CnfFormula(object):
         literals_length = {k: len(v) for k,v in self.literal_to_clauses.items()}
         literals_length_sorted = sorted(literals_length, key=literals_length.get, reverse=1)
         for l in literals_length_sorted:
+            if literals_length[l] == 0:
+                return None
             if l.variable not in assignments:
                 return l
         # # TODO: Might be helpful to keep the literal that apperas the most (for the decision heuristic)

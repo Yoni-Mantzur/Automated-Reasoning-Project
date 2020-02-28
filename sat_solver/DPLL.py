@@ -13,10 +13,11 @@ class DPLL(object):
     def __init__(self, cnf_formula: CnfFormula, partial_assignment=None, watch_literals=None, implication_graph=None,
                  is_first_run=True,
                  propagate_helper: Callable[[Dict[Variable, bool]], Optional[Dict[Variable, bool]]] = None,
-                 conflict_helper:  Callable[[Dict[Variable, bool]], List[Literal]] = None):
+                 conflict_helper:  Callable[[Dict[Variable, bool]], List[Literal]] = None, rec_num=None):
         self._assignment = partial_assignment or [{}]
         self.watch_literals = watch_literals or defaultdict(list)
         self.implication_graph = implication_graph or ImplicationGraph(cnf_formula)  # implication_graph or {}
+        self.rec_num = rec_num or None
 
         self.formula = cnf_formula
         self.conflict_helper = conflict_helper
@@ -32,6 +33,7 @@ class DPLL(object):
 
         self.unsat = None
         if is_first_run:
+            self.rec_num = 0
             self.unit_propagation()
 
     def initialize_watch_literals(self):
@@ -83,6 +85,9 @@ class DPLL(object):
         :param reason: the clause that caused this assignment, if None the reason is decided
         :return: None if can't do this assignment, otherwise a new formula (also editing the self._formulas[-1])
         '''
+        if self.formula is None:
+            return None
+
         assert literal.variable not in self._assignment[-1], literal.variable
         self._assignment[-1][literal.variable] = not literal.negated
 
@@ -105,9 +110,8 @@ class DPLL(object):
             # One of the clauses can not be satisfied with the current assignment, learn the conflict and go up the tree
             conflict_clause = self.implication_graph.learn_conflict(literal, clause_unsatisfied)
             # TODO: Understand why we got duplicate literals
-            self.learned_sat_conflicts = list(set(conflict_clause))
+            self.learned_sat_conflicts = conflict_clause
             self.backjump = self.implication_graph.get_backjump_level(conflict_clause)
-
             return None
 
         self.formula = self._unit_propagation_watch_literals(literal)
@@ -121,6 +125,8 @@ class DPLL(object):
         '''
         not_lit = copy(literal).negate()
         for i, clause in enumerate(self.watch_literals[not_lit]):
+            if clause >= len(self.formula.clauses):
+                continue
             clause_unsatisfied = True if self.formula.clauses[clause] != [] else False
             for lit in self.formula.clauses[clause]:
                 if lit.variable not in self._assignment[-1]:
@@ -150,6 +156,8 @@ class DPLL(object):
 
         learn_assingments = []
         for sub_formula_idx in self.watch_literals[n_literal]:
+            if sub_formula_idx >= len(self.formula.clauses):
+                continue
             hope = True
             other_watch = None
             for lit in self.formula.clauses[sub_formula_idx]:
@@ -166,6 +174,10 @@ class DPLL(object):
             # only other_watch and the current assigned literal are not assigned, assign the other_watch
             if other_watch is not None and hope:
                 learn_assingments.append((other_watch, sub_formula_idx))
+        #  TODO: Whats going on here? might be that we didn't find other_watch
+        # for c in self.watch_literals[n_literal]:
+        #     if len([(k, v) for k, v in self.watch_literals.items() if c in v]) != 3:
+        #         print('DEBUG')
         del self.watch_literals[n_literal]
         if self.formula is None or self.formula.clauses == [[]]:
             return self.formula
@@ -229,25 +241,33 @@ class DPLL(object):
         return True
 
     def search(self) -> bool:
+        '''
+
+        :return: True if Sat else False
+        '''
+
+        self.rec_num += 1
+        # if self.rec_num > 70:
+        #     print("DEBUG")
+        # if self.rec_num > 30 and self.rec_num % 10 == 0:
+        #     print("depth: {}".format(self.rec_num))
         if self.formula is None:
             # Formula is unsat
             return False
         real_formula = [f for f in self.formula.clauses if f != []]
         if not real_formula:
             if not self.check_theory_conflict():
-                # The current assingment satafias all clauses but theroy finds a conflict
+                # The current assignment satisfies all clauses but theory finds a conflict
                 return False
-            # Found valid assinment
+            # Found valid assignment
             self.unsat = False
             return True
 
         # current_variables = self.formula.get_variables()
-        # TOOD: does this heuristic make sense? we try the literal which appears the most, but if it is UNSAT we negate
+        # TODO: does this heuristic make sense? we try the literal which appears the most, but if it is UNSAT we negate
         # it and try again, the second literal might not be very helpful
-
         self.check_theory_conflict()
         if self.propagate_helper:
-
             smt_res = self.propagate_helper(self._assignment[-1])
             # smt_res will be None if partial_assignment is empty
             if smt_res is not None:
@@ -274,6 +294,8 @@ class DPLL(object):
                     return False
 
         next_decision_lit = self.decision_heuristic()
+        if next_decision_lit is None:
+            return False
         assert isinstance(next_decision_lit, Literal)
         next_decision = next_decision_lit.variable
         assert isinstance(next_decision, Variable)
@@ -282,6 +304,7 @@ class DPLL(object):
         for d in assignment_order:
             if self.backjump and self.backjump > len(self._assignment) - 1:
                 # Skip this level
+                self.implication_graph.remove_level(len(self._assignment) - 1)
                 return False
             elif self.backjump == len(self._assignment) - 1:
                 # Finished to do backjump
@@ -293,10 +316,8 @@ class DPLL(object):
 
             dpll = DPLL(deepcopy(self.formula), watch_literals=self.watch_literals, partial_assignment=cur_assignment,
                         implication_graph=self.implication_graph, is_first_run=False,
-                        conflict_helper=self.conflict_helper, propagate_helper=self.propagate_helper)
+                        conflict_helper=self.conflict_helper, propagate_helper=self.propagate_helper, rec_num=self.rec_num)
             dpll.assign_true_to_literal(Literal(next_decision, not d), reason=None)
-            # formula = self.unit_propagation(formula)
-            # TODO: use propagate_helper to update your current assignment (it's callable from smt solver)
 
             sat = dpll.search()
             if dpll.learned_sat_conflicts:
@@ -306,18 +327,13 @@ class DPLL(object):
 
             if sat:
                 if not self.check_theory_conflict():
-                    # The current assingment satafias all clauses but theroy finds a conflict
+                    # The current assignment satisfies all clauses but theory finds a conflict
                     return False
-                # Before decalring sat make sure no conflict in the theory solver
                 self.unsat = False
-                # TODO: Make sure no conflicts in the SMT
                 return sat
 
             # clear the last decision
             decision_level = len(self._assignment) - 1
-            # decision_literal = self.implication_graph_root[decision_level] if decision_level > 0 else 0
-            # del self.implication_graph[(decision_literal, decision_level)]
-            # self.implication_graph_root.pop(decision_level)
             self.implication_graph.remove_level(decision_level)
             self._assignment.pop()
 
