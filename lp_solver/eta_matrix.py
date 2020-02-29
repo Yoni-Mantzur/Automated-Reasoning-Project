@@ -1,9 +1,11 @@
+from typing import List, Union
+
 import numpy as np
 
 
 class EtaMatrix(object):
-    def __init__(self, column: np.ndarray, column_idx: int):
-        self.column = column
+    def __init__(self, column: Union[List, np.ndarray], column_idx: int):
+        self.column = np.array(column) if type(column) == list else column
         self.column_idx = column_idx
 
     def invert(self) -> 'EtaMatrix':
