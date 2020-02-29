@@ -13,7 +13,8 @@ class Equation(object):
 
     TYPES = tuple(t.value for t in Type)
 
-    def __init__(self, units: Dict[int, float] = None, type_equation: Type = Type.LE, scalar: float = None):
+    def __init__(self, units: Dict[int, float] = None, type_equation: Type = Type.LE,
+                 scalar: float = None):
         self.units = units or {}
         self.type = type_equation
         self.max_variable_index = -1
@@ -150,12 +151,14 @@ class LpProgram(object):
                'An (shape=%s): \n %s\nXn (shape=%s): \n %s\n' \
                'Cb (shape=%s): \n %s\nCn (shape=%s): \n %s\n' \
                'b (shape=%s): \n %s\n' \
-               % (self.B.shape, self.B, self.Xb.shape, self.Xb, self.An.shape, self.An, self.Xn.shape, self.Xn,
-                  self.Cb.shape, self.Cb, self.Cn.shape, self.Cn, self.b.shape, self.b)
+               % (
+               self.B.shape, self.B, self.Xb.shape, self.Xb, self.An.shape, self.An, self.Xn.shape,
+               self.Xn,
+               self.Cb.shape, self.Cb, self.Cn.shape, self.Cn, self.b.shape, self.b)
 
     def dump(self):
         print("Lp program:")
-        print('*'*100)
+        print('*' * 100)
 
         print("Equations:")
         variables = np.append(self.Xn, self.Xn)
@@ -170,6 +173,4 @@ class LpProgram(object):
         units = {c: v for c, v in zip(variables, coefs)}
 
         print(str(Equation(units)))
-        print('*'*100)
-
-
+        print('*' * 100)
