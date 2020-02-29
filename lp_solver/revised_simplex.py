@@ -9,14 +9,11 @@ def backward_transformation(B: Union[EtaMatrix, np.ndarray], Cb):
         B_inverted = B.invert()
         y = np.array(Cb)
 
-        b_inv = np.reshape(B_inverted.column, (1, len(B_inverted.column)))
-        Cb = np.reshape((1, len(Cb)))
-
-        y[B_inverted.column_idx] = np.multiply(b_inv, Cb.T)
+        y[B_inverted.column_idx] = np.dot(B_inverted.column, Cb)
 
     # Temporary, until we'll implement LU decomposition
     else:
-        y = np.multiply(Cb, np.linalg.inv(B))
+        y = np.dot(Cb, np.linalg.inv(B))
 
     return y
 
