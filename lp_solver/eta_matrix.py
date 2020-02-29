@@ -1,5 +1,3 @@
-from typing import List
-
 import numpy as np
 
 
@@ -17,6 +15,6 @@ class EtaMatrix(object):
 
     def get_matrix(self) -> np.ndarray:
         eta_matrix = np.identity(len(self.column))
-        eta_matrix[:,self.column_idx] = self.column
+        eta_matrix[:, self.column_idx] = self.column
 
         return eta_matrix
