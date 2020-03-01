@@ -45,3 +45,4 @@ def test_simple_lp(rule):
     constraints = ['0x0,2x1,3x2,x3<=5', '4x1,x2,2x3<=11', '3x1,4x2,2x3<=8']
     lp = LpProgram(constraints, objective, rule=rule)
     assert lp.solve() == 13
+

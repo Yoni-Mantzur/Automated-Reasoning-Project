@@ -195,10 +195,35 @@ class LpProgram(object):
 
         np.testing.assert_almost_equal(t1, self.B[:, leaving_idx])
 
-    def solve(self) -> float:
+    def get_good_entering_leaving_idx(self):
+        '''
+        Makes sure the eta matrix will not contain very small numbers, to keep numerical stability
+        '''
         entering_idx = get_entering_variable_idx(self)
-        while entering_idx >= 0:
+        leaving_idx, t, d = get_leaving_variable_idx(self, entering_idx)
+
+        bad_vars = set()
+        while entering_idx >= 0 and d[leaving_idx] <= EPSILON:
+            entering_idx = get_entering_variable_idx(self, bad_vars)
             leaving_idx, t, d = get_leaving_variable_idx(self, entering_idx)
+            bad_vars.add(entering_idx)
+
+        return entering_idx, leaving_idx, t, d
+
+    def solve(self) -> float:
+        # TODO: Implement safegurd (lec. 12 slide 58)
+        # TODO: Implement refactorization
+        # TODO: Initial solution (check if the zero vector is valid if not solve it)
+        # TODO: Connect to the SMT solver  ???
+        # TODO: Add LP tests (compare to Gurobi)
+        # TODO: Add SMT tests (if we are series)
+        entering_idx = 0  # get_entering_variable_idx(self)
+        while entering_idx >= 0:
+            # leaving_idx, t, d = get_leaving_variable_idx(self, entering_idx)
+            entering_idx, leaving_idx, t, d = self.get_good_entering_leaving_idx()
+
+            if entering_idx < 0:
+                break
             if leaving_idx == -1:
                 return np.inf
 
@@ -207,7 +232,7 @@ class LpProgram(object):
             self.b -= t * d
             self.b[leaving_idx] = t
 
-            entering_idx = get_entering_variable_idx(self)
+            # entering_idx = get_entering_variable_idx(self)
 
         # TODO: Do we need to extract the actual assignment (for the real variables)?
         # y = backward_transformation(self.B, self.Cb)

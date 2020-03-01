@@ -1,25 +1,30 @@
 import functools
-from typing import Union, List, Callable, TYPE_CHECKING, Tuple
+from typing import Union, List, Callable, TYPE_CHECKING, Tuple, Set
 
 import numpy as np
 
 from lp_solver.eta_matrix import EtaMatrix
 
+EPSILON = 10 ** -4
 if TYPE_CHECKING:
     pass
 
 
 def extract_legal_coefficients(rule: Callable[[Union[np.ndarray, List[float]], Union[np.ndarray, List[int]]], int]):
     @functools.wraps(rule)
-    def _wrapper(coefficients: Union[np.ndarray, List[float]], variables: Union[np.ndarray, List[int]]) -> int:
+    def _wrapper(coefficients: Union[np.ndarray, List[float]], variables: Union[np.ndarray, List[int]],
+                 bad_vars: Set[int]) -> int:
 
         if len(coefficients) != len(variables):
             raise Exception('Non matching vars/coef size')
 
-        if np.max(coefficients) <= 0:
+        # Zero tolerance
+        if np.max(coefficients) <= EPSILON and set(variables) == bad_vars:
             return -1
 
-        filtered_coeffs, filtered_vars = zip(*(filter(lambda unit: unit[0] > 0, zip(coefficients, variables))))
+        # Remove bad variables: i.e. given or with negative coefficient
+        filtered_coeffs, filtered_vars = zip(
+            *(filter(lambda unit: unit[0] > 0 or unit[1] not in bad_vars, zip(coefficients, variables))))
 
         chosen_var = rule(filtered_coeffs, filtered_vars)
 
@@ -32,12 +37,13 @@ def extract_legal_coefficients(rule: Callable[[Union[np.ndarray, List[float]], U
 
 
 @extract_legal_coefficients
-def blands_rule(_: Union[np.ndarray, List[float]], variables: Union[np.ndarray, List[int]]) -> int:
+def blands_rule(_: Union[np.ndarray, List[float]], variables: Union[np.ndarray, List[int]], bad_vars: Set[int]) -> int:
     return int(np.min(variables))
 
 
 @extract_legal_coefficients
-def dantzig_rule(coefficients: Union[np.ndarray, List[float]], variables: Union[np.ndarray, List[int]]) -> int:
+def dantzig_rule(coefficients: Union[np.ndarray, List[float]], variables: Union[np.ndarray, List[int]],
+                 bad_vars: Set[int]) -> int:
     # TODO: Break tie in coefficients using smaller index (from variables)
     # TODO: add test
     return variables[np.argmax(coefficients)]
@@ -70,7 +76,7 @@ def forward_transformation(B: Union[EtaMatrix, np.ndarray], a: np.ndarray) -> np
     return d
 
 
-def get_entering_variable_idx(lp_program) -> int:
+def get_entering_variable_idx(lp_program, bad_vars: Set[int]) -> int:
     y = lp_program.Cb
     for eta in lp_program.etas[::-1]:
         y = backward_transformation(eta, y)
@@ -81,7 +87,7 @@ def get_entering_variable_idx(lp_program) -> int:
     coefs = lp_program.Cn - np.dot(y, lp_program.An)
     variables = lp_program.Xn
 
-    return lp_program.rule(coefs, variables)
+    return lp_program.rule(coefs, variables, bad_vars)
 
 
 def is_unbounded(leaving_var_coefficient: np.ndarray) -> bool:

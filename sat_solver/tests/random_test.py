@@ -78,7 +78,7 @@ if __name__ == "__main__":
     # get_z3_result(create_random_query(5, 2, 3))
     seed(0)
 
-    for _ in tqdm(range(30)):
+    for _ in tqdm(range(100)):
         num_var = randint(1, 10) * 2
         num_clause = randint(1, 10) * 10
         var_per_clause = randint(2, min(num_var, 10))
