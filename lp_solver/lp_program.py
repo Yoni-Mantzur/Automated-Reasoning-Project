@@ -1,8 +1,8 @@
 import enum
 import re
-from typing import Dict, Tuple, Union, List
+from typing import Dict
 
-import numpy as np
+from lp_solver.revised_simplex import *
 
 
 class Equation(object):
@@ -33,7 +33,6 @@ class Equation(object):
         for unit in units:
             v, c = Equation.unit_from_str(unit.strip())
 
-            # TODO: should we leave 0 coef?
             if c != 0:
                 self.units[v] = c
 
@@ -64,11 +63,9 @@ class Equation(object):
     def __str__(self):
         units_str = ''
         for v, c in self.units.items():
-
-            # TODO: should we need c==0?
-            if c != 0:
-                sign = ('+' if c > 0 else '')
-                units_str += '%s%.2fx%d' % (sign, c, v)
+            # if c != 0:
+            sign = ('+' if c > 0 else '')
+            units_str += '%s%.2fx%d' % (sign, c, v)
 
         if self.scalar:
             return '%s %s %.2f' % (units_str, self.type.value, self.scalar)
@@ -86,9 +83,12 @@ class Equation(object):
 
 
 class LpProgram(object):
-    def __init__(self, equations: List[Union[Equation, str]] = None, objective: Union[Equation, str] = None):
+    def __init__(self, equations: List[Union[Equation, str]] = None, objective: Union[Equation, str] = None,
+                 rule: str = 'Dantzig'):
         # Basis, coefficients and variables
+        # self.B = [] # type: # List[EtaMatrix]
         self.B = np.array([[]])  # type: np.ndarray
+        self.etas = []  # type: List[EtaMatrix]
         self.Xb = np.array([])  # type: np.ndarray
 
         # Non-basic coefficients and variables
@@ -106,6 +106,10 @@ class LpProgram(object):
         self.Cn = None
         if objective:
             self._create_objective(objective)
+
+        rules = {'dantzig': dantzig_rule,
+                 'bland': blands_rule}
+        self.rule = rules.get(rule.lower(), rules['dantzig'])
 
     def _create_objective(self, objective: Union[Equation, str]):
         if isinstance(objective, str):
@@ -130,13 +134,14 @@ class LpProgram(object):
 
             if equation.max_variable_index > n:
                 n = equation.max_variable_index + 1
+                self.Xn = list(range(n))
 
         self.An = np.zeros(shape=(m, n))
         for i, equation in enumerate(equations):
             cur_equation = np.zeros(shape=(n,))
             for variable, coefficient in equation.units.items():
-                if variable not in self.Xn:
-                    self.Xn = np.append(self.Xn, variable)
+                # if variable not in self.Xn:
+                #     self.Xn = np.append(self.Xn, variable)
                 assert variable < cur_equation.shape[0]
                 cur_equation[variable] = coefficient
 
@@ -149,14 +154,15 @@ class LpProgram(object):
         self.B = np.eye(len(self.Xb))
 
     def __str__(self):
-        return 'B (shape=%s): \n %s\nXb (shape=%s): \n %s\n' \
+        return 'B (shape: %s): \n%s\nXb (shape=%s): \n %s\n' \
                'An (shape=%s): \n %s\nXn (shape=%s): \n %s\n' \
                'Cb (shape=%s): \n %s\nCn (shape=%s): \n %s\n' \
                'b (shape=%s): \n %s\n' \
                % (
-               self.B.shape, self.B, self.Xb.shape, self.Xb, self.An.shape, self.An, self.Xn.shape,
-               self.Xn,
-               self.Cb.shape, self.Cb, self.Cn.shape, self.Cn, self.b.shape, self.b)
+                   self.B.shape, self.B,
+                   self.Xb.shape, self.Xb, self.An.shape, self.An, self.Xn.shape,
+                   self.Xn,
+                   self.Cb.shape, self.Cb, self.Cn.shape, self.Cn, self.b.shape, self.b)
 
     def dump(self):
         print("Lp program:")
@@ -176,3 +182,35 @@ class LpProgram(object):
 
         print(str(Equation(units)))
         print('*' * 100)
+
+    def swap_basis(self, entering_idx, leaving_idx, d):
+        self.Xb[leaving_idx], self.Xn[entering_idx] = self.Xn[entering_idx], self.Xb[leaving_idx]
+        self.Cb[leaving_idx], self.Cn[entering_idx] = self.Cn[entering_idx], self.Cb[leaving_idx]
+
+        t1, t2 = np.copy(self.An[:, entering_idx]), np.copy(self.B[:, leaving_idx])
+
+        self.An[:, entering_idx] = self.B[:, leaving_idx]
+        self.etas += [EtaMatrix(d, column_idx=leaving_idx)]
+        self.B = np.dot(self.B, self.etas[-1].get_matrix())
+
+        np.testing.assert_almost_equal(t1, self.B[:, leaving_idx])
+
+    def solve(self) -> float:
+        entering_idx = get_entering_variable_idx(self)
+        while entering_idx >= 0:
+            leaving_idx, t, d = get_leaving_variable_idx(self, entering_idx)
+            if leaving_idx == -1:
+                return np.inf
+
+            self.swap_basis(entering_idx, leaving_idx, d)
+            # Update the assignments
+            self.b -= t * d
+            self.b[leaving_idx] = t
+
+            entering_idx = get_entering_variable_idx(self)
+
+        # TODO: Do we need to extract the actual assignment (for the real variables)?
+        # y = backward_transformation(self.B, self.Cb)
+        # coefs = self.Cn - np.dot(y, self.An)
+        # np.dot(self.b, coefs) +
+        return float(np.dot(self.Cb, self.b))

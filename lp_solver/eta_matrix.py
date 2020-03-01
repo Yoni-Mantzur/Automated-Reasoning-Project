@@ -7,13 +7,16 @@ class EtaMatrix(object):
     def __init__(self, column: Union[List, np.ndarray], column_idx: int):
         self.column = np.array(column) if type(column) == list else column
         self.column_idx = column_idx
+        self.cache_invert = None
 
     def invert(self) -> 'EtaMatrix':
-        diagonal_element_inverted = 1 / self.column[self.column_idx]
-        inverted_column = diagonal_element_inverted * (-self.column)
-        inverted_column[self.column_idx] = diagonal_element_inverted
+        if not self.cache_invert:
+            diagonal_element_inverted = 1 / self.column[self.column_idx]
+            inverted_column = diagonal_element_inverted * (-self.column)
+            inverted_column[self.column_idx] = diagonal_element_inverted
+            self.cache_invert = EtaMatrix(inverted_column, self.column_idx)
 
-        return EtaMatrix(inverted_column, self.column_idx)
+        return self.cache_invert
 
     def get_matrix(self) -> np.ndarray:
         eta_matrix = np.identity(len(self.column))

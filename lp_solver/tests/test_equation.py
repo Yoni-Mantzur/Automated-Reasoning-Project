@@ -24,6 +24,3 @@ def test_expression_parsing():
 
         # print("testing the equation: %s" % raw_equation)
         assert Equation.get_expression(raw_equation) == equation
-
-if __name__ == "__main__":
-    test_equation_parsing()

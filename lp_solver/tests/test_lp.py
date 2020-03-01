@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from lp_solver.lp_program import LpProgram
 
@@ -27,8 +28,20 @@ def test_initialize():
     objective_basic = np.zeros(shape=len(basic_variables))
     assert np.array_equal(lp.Cb, objective_basic)
     assert np.array_equal(lp.Cn, objective_non_basic)
-    lp.dump()
-    print(lp)
+    # lp.dump()
+    # print(lp)
 
-if __name__ == "__main__":
-    test_initialize()
+
+# def test_simple_lp():
+#     objective = '5x1,4x2,3x3'
+#     constraints = ['2x1,3x2,x3<=5', '4x1,x2,2x3<=11', '3x1,4x2,2x3<=8']
+#     lp = LpProgram(constraints, objective, rule='Dantzig')
+#     assert lp.solve == 13
+
+
+@pytest.mark.parametrize('rule', ['bland', 'dantzig'])
+def test_simple_lp(rule):
+    objective = '5x1,4x2,3x3'
+    constraints = ['0x0,2x1,3x2,x3<=5', '4x1,x2,2x3<=11', '3x1,4x2,2x3<=8']
+    lp = LpProgram(constraints, objective, rule=rule)
+    assert lp.solve() == 13

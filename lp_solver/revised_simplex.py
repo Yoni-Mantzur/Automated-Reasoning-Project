@@ -1,15 +1,18 @@
 import functools
-from typing import Union, List, Callable
+from typing import Union, List, Callable, TYPE_CHECKING, Tuple
 
 import numpy as np
 
 from lp_solver.eta_matrix import EtaMatrix
-from lp_solver.lp_program import LpProgram
+
+if TYPE_CHECKING:
+    pass
 
 
 def extract_legal_coefficients(rule: Callable[[Union[np.ndarray, List[float]], Union[np.ndarray, List[int]]], int]):
     @functools.wraps(rule)
     def _wrapper(coefficients: Union[np.ndarray, List[float]], variables: Union[np.ndarray, List[int]]) -> int:
+
         if len(coefficients) != len(variables):
             raise Exception('Non matching vars/coef size')
 
@@ -35,10 +38,12 @@ def blands_rule(_: Union[np.ndarray, List[float]], variables: Union[np.ndarray, 
 
 @extract_legal_coefficients
 def dantzig_rule(coefficients: Union[np.ndarray, List[float]], variables: Union[np.ndarray, List[int]]) -> int:
+    # TODO: Break tie in coefficients using smaller index (from variables)
+    # TODO: add test
     return variables[np.argmax(coefficients)]
 
 
-def backward_transformation(B: Union[EtaMatrix, np.ndarray], Cb):
+def backward_transformation(B: Union[EtaMatrix, np.ndarray], Cb: np.ndarray) -> np.ndarray:
     if isinstance(B, EtaMatrix):
         B_inverted = B.invert()
         y = np.array(Cb)
@@ -52,7 +57,7 @@ def backward_transformation(B: Union[EtaMatrix, np.ndarray], Cb):
     return y
 
 
-def forward_transformation(B: Union[EtaMatrix, np.ndarray], a):
+def forward_transformation(B: Union[EtaMatrix, np.ndarray], a: np.ndarray) -> np.ndarray:
     if isinstance(B, EtaMatrix):
         B_inverted = B.invert()
         d = np.array([a[i] + B_inverted.column[i] * a[B.column_idx] for i in range(len(a))])
@@ -65,20 +70,53 @@ def forward_transformation(B: Union[EtaMatrix, np.ndarray], a):
     return d
 
 
-def get_entering_variable_idx(lp_program: LpProgram,
-                              rule: Callable[[Union[np.ndarray, List[float]], Union[np.ndarray, List[int]]], int]):
-    y = backward_transformation(lp_program.B, lp_program.Cb)
+def get_entering_variable_idx(lp_program) -> int:
+    y = lp_program.Cb
+    for eta in lp_program.etas[::-1]:
+        y = backward_transformation(eta, y)
 
+    y_tag = backward_transformation(lp_program.B, lp_program.Cb)
+    # assert np.array_equal(y_tag, y)
+    np.testing.assert_almost_equal(y_tag, y)
     coefs = lp_program.Cn - np.dot(y, lp_program.An)
     variables = lp_program.Xn
 
-    return rule(coefs, variables)
+    return lp_program.rule(coefs, variables)
 
 
-def get_leaving_variable_idx(lp_program: LpProgram, entring_variable_idx: int):
-    a = lp_program.An[:, entring_variable_idx]
-    d = forward_transformation(lp_program.B, a)
+def is_unbounded(leaving_var_coefficient: np.ndarray) -> bool:
+    return all(leaving_var_coefficient < 0)
+
+
+def get_leaving_variable_idx(lp_program, entering_variable_idx: int) -> Tuple[int, float, np.array]:
+    a = lp_program.An[:, entering_variable_idx]
+
+    d = np.copy(a)
+    for eta in lp_program.etas:
+        d = forward_transformation(eta, d)
+    d_tag = forward_transformation(lp_program.B, a)
+    # assert np.array_equal(d, d_tag)
+    np.testing.assert_almost_equal(d, d_tag)
+    if is_unbounded(d):
+        # TODO: Create exception and raise it (if you are brave enough)
+        return -1, -1, None
 
     b = lp_program.b
 
-    return np.argmin(b / d)
+    assert any(d != 0)
+    d[d == 0] = 1 / np.inf
+    # (lecture 12 slide 21)
+    t = b / d
+    leaving_var = int(np.argmin(t))
+    return leaving_var, t[leaving_var], d
+
+# def refactorization(B: np.ndarray, etas: List[EtaMatrix]) -> np.ndarray:
+#     '''
+#     Create a fresh basis out of the current basis and a list of transformations
+#     :param B: previous basis
+#     :param etas: list of transformations
+#     :return: fresh basis
+#     '''
+#     for e in etas:
+#         B = np.dot(B, e)
+#
