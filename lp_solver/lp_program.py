@@ -86,7 +86,7 @@ class Equation(object):
 
 
 class LpProgram(object):
-    def __init__(self, equations: List[Union[Equation, str]], objective: Union[Equation, str]):
+    def __init__(self, equations: List[Union[Equation, str]] = None, objective: Union[Equation, str] = None):
         # Basis, coefficients and variables
         self.B = np.array([[]])  # type: np.ndarray
         self.Xb = np.array([])  # type: np.ndarray
@@ -98,12 +98,14 @@ class LpProgram(object):
         # constraints scalars
         self.b = np.array([])  # type: np.ndarray
 
-        self._add_equations(equations)
+        if equations:
+            self._add_equations(equations)
 
         # Objective coefficients for basic and non basic variables
         self.Cb = None
         self.Cn = None
-        self._create_objective(objective)
+        if objective:
+            self._create_objective(objective)
 
     def _create_objective(self, objective: Union[Equation, str]):
         if isinstance(objective, str):

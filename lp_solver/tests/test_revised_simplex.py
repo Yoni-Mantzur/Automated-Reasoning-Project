@@ -1,8 +1,10 @@
-import pytest
 import numpy as np
+import pytest
 
 from lp_solver.eta_matrix import EtaMatrix
-from lp_solver.revised_simplex import backward_transformation, forward_transformation
+from lp_solver.lp_program import Equation, LpProgram
+from lp_solver.revised_simplex import backward_transformation, forward_transformation, blands_rule, dantzig_rule, \
+    get_entering_variable_idx
 
 test_cases_btran = [[EtaMatrix([-4, 3, 2], 1), [1, 2, 3], [1, 0, 3]]]
 test_cases_ftran = [[EtaMatrix([-4, 3, 2], 1), [1, 2, 3], [1 + 8 / 3, 2 / 3, 3 - 4 / 3]]]
@@ -24,3 +26,37 @@ def assert_transformation(B, x, expected_result, transformation):
 
     assert np.array_equal(actual_result_with_eta_matrix, actual_result_with_matrix)
     assert np.array_equal(actual_result_with_eta_matrix, expected_result)
+
+
+rules_test_cases = [[[0.5, 4, 3], [1, 4, 2], (0, 1)],
+                    [[0.5, 0.5], [1, 5], (1, 0)],
+                    [[0, 0.5], [5, 1], (1, 1)],
+                    [[-0.5, -4, -3], [1, 4, 2], (-1, -1)]]
+
+
+@pytest.mark.parametrize(['coefs', 'variables', 'expected_chosen_var'], rules_test_cases)
+def test_blands_rule(coefs, variables, expected_chosen_var):
+    assert expected_chosen_var[0] == blands_rule(coefs, variables)
+
+
+@pytest.mark.parametrize(['coefs', 'variables', 'expected_chosen_var'], rules_test_cases)
+def test_dantzig_rule(coefs, variables, expected_chosen_var):
+    assert expected_chosen_var[1] == dantzig_rule(coefs, variables)
+
+
+def test_get_entering_variable_idx():
+    pytest.skip("wip")
+    lp_program = LpProgram()
+
+    lp_program.B = np.array([[3, 1, 0], [1, 1, 0], [4, 3, 1]])
+    lp_program.An = np.array([[2, 2, 1, 0], [1, 1, 0, 1], [3, 4, 0, 0]])
+    lp_program.Xb = np.array([1, 3, 7])
+    lp_program.Xn = np.array([2, 4, 5, 6])
+    lp_program.Cb = np.array([19, 12, 0])
+    lp_program.Cn = np.array([13, 17, 0, 0])
+
+    lp_program.b = np.array([54, 63, 15])
+    expected_var = 1
+
+    assert expected_var == get_entering_variable_idx(lp_program, rule=dantzig_rule)
+    assert expected_var == get_entering_variable_idx(lp_program, rule=blands_rule)
