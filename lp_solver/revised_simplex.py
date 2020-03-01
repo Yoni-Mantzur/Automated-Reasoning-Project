@@ -13,24 +13,29 @@ def extract_legal_coefficients(rule: Callable[[Union[np.ndarray, List[float]], U
         if len(coefficients) != len(variables):
             raise Exception('Non matching vars/coef size')
 
-        if max(coefficients) <= 0:
+        if np.max(coefficients) <= 0:
             return -1
 
-        coefficients, variables = zip(*list(filter(lambda unit: unit[0] > 0, zip(coefficients, variables))))
-        return rule(coefficients, variables)
+        filtered_coeffs, filtered_vars = zip(*(filter(lambda unit: unit[0] > 0, zip(coefficients, variables))))
+
+        chosen_var = rule(filtered_coeffs, filtered_vars)
+
+        if type(variables) == np.ndarray:
+            variables = variables.tolist()
+
+        return variables.index(chosen_var)
+
     return _wrapper
 
 
 @extract_legal_coefficients
 def blands_rule(_: Union[np.ndarray, List[float]], variables: Union[np.ndarray, List[int]]) -> int:
-    """ return the index of the chosen variable """
-    return int(np.argmin(variables))
+    return int(np.min(variables))
 
 
 @extract_legal_coefficients
-def dantzig_rule(coefficients: Union[np.ndarray, List[float]], _: Union[np.ndarray, List[int]]) -> int:
-    """ return the index of the chosen variable """
-    return int(np.argmax(coefficients))
+def dantzig_rule(coefficients: Union[np.ndarray, List[float]], variables: Union[np.ndarray, List[int]]) -> int:
+    return variables[np.argmax(coefficients)]
 
 
 def backward_transformation(B: Union[EtaMatrix, np.ndarray], Cb):

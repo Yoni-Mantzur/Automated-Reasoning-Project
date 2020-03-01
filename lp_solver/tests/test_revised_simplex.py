@@ -29,7 +29,7 @@ def assert_transformation(B, x, expected_result, transformation):
 
 
 rules_test_cases = [[[0.5, 4, 3], [1, 4, 2], (0, 1)],
-                    [[0.5, 0.5], [1, 5], (1, 0)],
+                    [[0.5, 0.5], [1, 5], (0, 0)],
                     [[0, 0.5], [5, 1], (1, 1)],
                     [[-0.5, -4, -3], [1, 4, 2], (-1, -1)]]
 
@@ -45,7 +45,6 @@ def test_dantzig_rule(coefs, variables, expected_chosen_var):
 
 
 def test_get_entering_variable_idx():
-    pytest.skip("wip")
     lp_program = LpProgram()
 
     lp_program.B = np.array([[3, 1, 0], [1, 1, 0], [4, 3, 1]])
