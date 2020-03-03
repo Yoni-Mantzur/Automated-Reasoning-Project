@@ -176,7 +176,7 @@ class ImplicationGraph(object):
             return clause
 
         # clause = c
-        while uip_negate in clause and not self.is_two_literals_in_level(uip_level, clause):
+        while uip_negate not in clause or self.is_two_literals_in_level(uip_level, clause):
             shared_var = node.literal.variable
             clause_on_edge = self._formula.clauses[self._incoming_edges[node][-1].reason]  # c' in the slides
             clause = self.boolean_resolution(clause, clause_on_edge, shared_var)
