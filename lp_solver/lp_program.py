@@ -1,7 +1,7 @@
 import enum
 import re
 from typing import Dict
-
+import math
 from lp_solver.revised_simplex import *
 # from lp_solver import UnboundedException
 
@@ -206,7 +206,7 @@ class LpProgram(object):
         entering_idx = get_entering_variable_idx(self, bad_vars)
         leaving_idx, t, d = get_leaving_variable_idx(self, entering_idx)
 
-        while entering_idx >= 0 and d[leaving_idx] <= EPSILON:
+        while entering_idx >= 0 and math.fabs(d[leaving_idx]) <= EPSILON:
             entering_idx = get_entering_variable_idx(self, bad_vars)
             leaving_idx, t, d = get_leaving_variable_idx(self, entering_idx)
             bad_vars.add(entering_idx)
