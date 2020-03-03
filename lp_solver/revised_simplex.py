@@ -4,6 +4,7 @@ from typing import Union, List, Callable, TYPE_CHECKING, Tuple, Set
 import numpy as np
 
 from lp_solver.eta_matrix import EtaMatrix
+from lp_solver.UnboundedException import UnboundedException
 
 EPSILON = 10 ** -4
 if TYPE_CHECKING:
@@ -23,8 +24,16 @@ def extract_legal_coefficients(rule: Callable[[Union[np.ndarray, List[float]], U
             return -1
 
         # Remove bad variables: i.e. given or with negative coefficient
-        filtered_coeffs, filtered_vars = zip(
-            *(filter(lambda unit: unit[0] > 0 or unit[1] not in bad_vars, zip(coefficients, variables))))
+        # TODO: Sorry Yoni the zip(*filter()) does not work
+        # filtered_coeffs, filtered_vars = zip(
+        #     *(filter(lambda unit: unit[0] > 0 and unit[1] not in bad_vars, zip(coefficients, variables))))
+        filtered_coeffs, filtered_vars = [], []
+        for c, v in zip(coefficients, variables):
+            if c > 0 and v not in bad_vars:
+                filtered_coeffs.append(c)
+                filtered_vars.append(v)
+        if len(filtered_coeffs) == 0:
+            return -1
 
         chosen_var = rule(filtered_coeffs, filtered_vars)
 
@@ -37,13 +46,12 @@ def extract_legal_coefficients(rule: Callable[[Union[np.ndarray, List[float]], U
 
 
 @extract_legal_coefficients
-def blands_rule(_: Union[np.ndarray, List[float]], variables: Union[np.ndarray, List[int]], bad_vars: Set[int]) -> int:
+def blands_rule(_: Union[np.ndarray, List[float]], variables: Union[np.ndarray, List[int]]) -> int:
     return int(np.min(variables))
 
 
 @extract_legal_coefficients
-def dantzig_rule(coefficients: Union[np.ndarray, List[float]], variables: Union[np.ndarray, List[int]],
-                 bad_vars: Set[int]) -> int:
+def dantzig_rule(coefficients: Union[np.ndarray, List[float]], variables: Union[np.ndarray, List[int]]) -> int:
     # TODO: Break tie in coefficients using smaller index (from variables)
     # TODO: add test
     return variables[np.argmax(coefficients)]
@@ -82,7 +90,6 @@ def get_entering_variable_idx(lp_program, bad_vars: Set[int]) -> int:
         y = backward_transformation(eta, y)
 
     y_tag = backward_transformation(lp_program.B, lp_program.Cb)
-    # assert np.array_equal(y_tag, y)
     np.testing.assert_almost_equal(y_tag, y)
     coefs = lp_program.Cn - np.dot(y, lp_program.An)
     variables = lp_program.Xn
@@ -104,8 +111,9 @@ def get_leaving_variable_idx(lp_program, entering_variable_idx: int) -> Tuple[in
     # assert np.array_equal(d, d_tag)
     np.testing.assert_almost_equal(d, d_tag)
     if is_unbounded(d):
+        raise UnboundedException()
         # TODO: Create exception and raise it (if you are brave enough)
-        return -1, -1, None
+        # return -1, -1, None
 
     b = lp_program.b
 

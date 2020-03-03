@@ -5,7 +5,7 @@ from lp_solver.lp_program import LpProgram
 
 
 def test_initialize():
-    matrix_str = ["4x1,5x2,-6x3>=-1", "4x3,5x0>=2", "3.1x1,1.1x2>=0"]
+    matrix_str = ["4x1,5x2,-6x3>=1", "4x3,5x0>=2", "3.1x1,1.1x2>=0"]
     objective_str = "2x1,-3x2,0x3"
     non_basic_variables = [0, 1, 2, 3]
     matrix = np.array([
@@ -16,7 +16,7 @@ def test_initialize():
 
     lp = LpProgram(matrix_str, objective_str)
     assert np.array_equal(lp.An, matrix)
-    assert np.array_equal(lp.b, [-1, 2, 0])
+    assert np.array_equal(lp.b, [1, 2, 0])
     assert sorted(lp.Xn) == sorted(non_basic_variables)
 
     basic_variables = [4, 5, 6]
@@ -45,4 +45,11 @@ def test_simple_lp(rule):
     constraints = ['0x0,2x1,3x2,x3<=5', '4x1,x2,2x3<=11', '3x1,4x2,2x3<=8']
     lp = LpProgram(constraints, objective, rule=rule)
     assert lp.solve() == 13
+
+
+def test_simple_lp2():
+    objective = '5x1,4x2,3.1x3'
+    constraints = ['0x0,2x1,3x2,x3<=5', '4x1,x2,2x3<=11', '3x1,4x2,2x3<=8']
+    lp = LpProgram(constraints, objective, rule='bland')
+    lp.solve()
 

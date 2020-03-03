@@ -3,7 +3,7 @@ import re
 from typing import Dict
 
 from lp_solver.revised_simplex import *
-
+# from lp_solver import UnboundedException
 
 class Equation(object):
     class Type(enum.Enum):
@@ -39,12 +39,12 @@ class Equation(object):
         self.max_variable_index = max(self.units.keys())
 
     def from_str(self, equation_str: str) -> None:
-        r = '(.*?)({})(-?[0-9]+$)'.format('|'.join(Equation.TYPES))
+        r = '(.*?)({})(-?[0-9.]+$)'.format('|'.join(Equation.TYPES))
         lhs, t, rhs = re.search(r, equation_str).groups()
 
         self.parse_lhs(lhs)
         self.type = Equation.Type(t)
-        self.scalar = int(rhs)
+        self.scalar = float(rhs)
 
         # TODO: Turn into normal form, i.e. transform the types into LE
 
@@ -147,6 +147,9 @@ class LpProgram(object):
 
             # Add row
             self.An[i, :] = cur_equation
+            if equation.scalar < 0:
+                # The assignment x=0 is not feasible, need to first solve the dual problem
+                raise NotImplementedError()
             self.b = np.append(self.b, equation.scalar)
 
         # Create the basic variables
@@ -199,10 +202,10 @@ class LpProgram(object):
         '''
         Makes sure the eta matrix will not contain very small numbers, to keep numerical stability
         '''
-        entering_idx = get_entering_variable_idx(self)
+        bad_vars = set()
+        entering_idx = get_entering_variable_idx(self, bad_vars)
         leaving_idx, t, d = get_leaving_variable_idx(self, entering_idx)
 
-        bad_vars = set()
         while entering_idx >= 0 and d[leaving_idx] <= EPSILON:
             entering_idx = get_entering_variable_idx(self, bad_vars)
             leaving_idx, t, d = get_leaving_variable_idx(self, entering_idx)
@@ -217,25 +220,28 @@ class LpProgram(object):
         # TODO: Connect to the SMT solver  ???
         # TODO: Add LP tests (compare to Gurobi)
         # TODO: Add SMT tests (if we are series)
-        entering_idx = 0  # get_entering_variable_idx(self)
-        while entering_idx >= 0:
-            # leaving_idx, t, d = get_leaving_variable_idx(self, entering_idx)
-            entering_idx, leaving_idx, t, d = self.get_good_entering_leaving_idx()
+        try:
+            entering_idx = 0  # get_entering_variable_idx(self)
+            while entering_idx >= 0:
+                # leaving_idx, t, d = get_leaving_variable_idx(self, entering_idx)
+                entering_idx, leaving_idx, t, d = self.get_good_entering_leaving_idx()
 
-            if entering_idx < 0:
-                break
-            if leaving_idx == -1:
-                return np.inf
+                if entering_idx < 0:
+                    break
+                if leaving_idx == -1:
+                    return np.inf
 
-            self.swap_basis(entering_idx, leaving_idx, d)
-            # Update the assignments
-            self.b -= t * d
-            self.b[leaving_idx] = t
+                self.swap_basis(entering_idx, leaving_idx, d)
+                # Update the assignments
+                self.b -= t * d
+                self.b[leaving_idx] = t
 
-            # entering_idx = get_entering_variable_idx(self)
+                # entering_idx = get_entering_variable_idx(self)
 
-        # TODO: Do we need to extract the actual assignment (for the real variables)?
-        # y = backward_transformation(self.B, self.Cb)
-        # coefs = self.Cn - np.dot(y, self.An)
-        # np.dot(self.b, coefs) +
-        return float(np.dot(self.Cb, self.b))
+            # TODO: Do we need to extract the actual assignment (for the real variables)?
+            # y = backward_transformation(self.B, self.Cb)
+            # coefs = self.Cn - np.dot(y, self.An)
+            # np.dot(self.b, coefs) +
+            return float(np.dot(self.Cb, self.b))
+        except UnboundedException:
+            return np.inf
