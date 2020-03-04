@@ -36,7 +36,10 @@ def delete_trivial_clauses(formula: CnfFormula) -> CnfFormula:
         if len(set(variables)) == len(clause):
             new_clauses.append(clause)
         else:
-            removed_clauses.add(clause_number)
+            # If we delete the clause we will need to update the literal_to_clause mapping, easier to just add an empty
+            # clause at the same location
+            new_clauses.append([])
+            # removed_clauses.add(clause_number)
 
     # update literal_to_clauses
     literal_to_clauses = formula.literal_to_clauses

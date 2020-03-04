@@ -108,7 +108,8 @@ class ImplicationGraph(object):
         for reason_literal in reason_formula:
             reason_variable = reason_literal.variable
             assert isinstance(reason_variable, Variable)
-            if literal.variable == reason_variable:
+            if literal.variable == reason_variable or reason_variable not in self._nodes:
+                # reason_variable might not be in self._nodes because the theory solver might give us this link
                 continue
             reason_node = self._nodes[reason_variable]
             e = Edge(reason_node, new_node, reason=reason_idx)

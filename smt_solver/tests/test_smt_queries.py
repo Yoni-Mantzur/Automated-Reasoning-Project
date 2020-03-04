@@ -51,6 +51,14 @@ def test_implies():
     print(assignment)
     assert res
 
+def test1():
+    s = '((((((a0=f0(a0)&a0=f0(a0))|a1=f1(a1))&f0(a0)=f0(a0))|~a0=f0(a0))&~f0(a0)=f0(a0))|a0=a0)'
+    f = Formula.from_str(s)
+    print(f.sat_formula)
+    res, assignment = f.solve()
+    print(assignment)
+    assert res
+
 def test_iff():
     # a=b iff f(a) = f(b), SAT for example a=b & f=identity function
     f = Formula.from_str('(f(a)=f(b)<->a=b)')

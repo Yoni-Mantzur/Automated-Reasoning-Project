@@ -217,9 +217,7 @@ class LpProgram(object):
         # TODO: Implement safegurd (lec. 12 slide 58)
         # TODO: Implement refactorization
         # TODO: Initial solution (check if the zero vector is valid if not solve it)
-        # TODO: Connect to the SMT solver  ???
-        # TODO: Add LP tests (compare to Gurobi)
-        # TODO: Add SMT tests (if we are series)
+        # TODO: Connect LP to the SMT solver  ???
         try:
             entering_idx = 0  # get_entering_variable_idx(self)
             while entering_idx >= 0:

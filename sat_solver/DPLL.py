@@ -47,7 +47,9 @@ class DPLL(object):
     def create_watch_literals(self, cluse_idx: int, clause: List[int] = []):
         if clause == []:
             clause = self.formula.clauses[cluse_idx]
-        if len(clause) <= 1:
+        if len(clause) == 0:
+            return
+        if len(clause) == 1:
             self.watch_literals[clause[0]].append(cluse_idx)
             return
         first_lit = randint(0, len(clause) - 1)
@@ -109,7 +111,6 @@ class DPLL(object):
         if clause_unsatisfied is not None:
             # One of the clauses can not be satisfied with the current assignment, learn the conflict and go up the tree
             conflict_clause = self.implication_graph.learn_conflict(literal, clause_unsatisfied)
-            # TODO: Understand why we got duplicate literals
             self.learned_sat_conflicts = conflict_clause
             self.backjump = self.implication_graph.get_backjump_level(conflict_clause)
             return None
@@ -270,9 +271,9 @@ class DPLL(object):
         if self.propagate_helper:
             smt_res = self.propagate_helper(self._assignment[-1])
             # smt_res will be None if partial_assignment is empty
-            if smt_res is not None:
+            if smt_res:
                 self._assignment[-1].update(smt_res)
-                print(self._assignment[-1])
+                # print(self._assignment[-1])
                 for variable, val in smt_res.items():
                     if val:
                         lit = Literal(variable, False)
@@ -286,8 +287,8 @@ class DPLL(object):
                 #     self.formula.clauses = [[]]
                 #     return self.formula
 
-                print(self._assignment[-1])
-                print("*"*100)
+                # print(self._assignment[-1])
+                # print("*"*100)
 
                 if not smt_res:
                     # Conflict
