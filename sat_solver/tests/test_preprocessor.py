@@ -33,7 +33,7 @@ def test_remove_redundant_literals():
 
 def test_delete_trivial_clauses():
     formula = remove_redundant_literals(CnfFormula([[l1, l2], [l1, l1, l3]]))
-    expected_formula = CnfFormula([[l1, l3]])
+    expected_formula = CnfFormula([[], [l1, l3]])
 
     actual_formula = delete_trivial_clauses(formula)
 

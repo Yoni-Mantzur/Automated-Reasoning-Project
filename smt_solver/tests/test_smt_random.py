@@ -13,7 +13,7 @@ seed(0)
 class UF:
     def __init__(self, name: str, max_num_vars: int):
         self.name = name
-        self.input_range = randint(1, max_num_vars)
+        self.input_range = randint(1, min(max_num_vars, 5))
         z3_input = [RealSort()] * self.input_range
         self.z3 = Function(name, *z3_input, RealSort())
 
@@ -89,12 +89,12 @@ def create_random_query(num_functions=4, num_variables=5, num_clauses=4):
     str_clause = str_clauses[0]
     z3_clause = z3_clauses[0]
     for i in range(1, len(str_clauses)):
-        op = choice(['&', '|'])
+        op = choice(['&', '|'][:1])
         if op == '&':
             z3_clause = And(z3_clause, z3_clauses[i])
         else:
             z3_clause = Or(z3_clause, z3_clauses[i])
-        str_clause = "({}{}{})".format(str_clause, op, str_clauses[i])
+        str_clause = f"({str_clause}{op}{str_clauses[i]})"
 
     return str_clause, z3_clause
 
@@ -135,8 +135,8 @@ def perform_test(str_query, z3_query, debug=False):
 
 
 random_smt = [
-    [1, 1, 3],
-    [2, 4, 3],
+    [1, 1, 30],
+    [2, 4, 10],
     [2, 4, 13],
     [1, 1, 14],
     [10, 20, 50],

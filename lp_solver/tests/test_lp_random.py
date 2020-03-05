@@ -24,32 +24,30 @@ class lp_variable():
         return self.gurobi_var
 
 
-def solve_gurobi() -> float:
-    return 2
-    gmodel = Model("test")
-    obj = LinExpr()
-
 
 def solve_our(equations_str, objective_str) -> float:
-    rule = 'dantzig'
+    rule = 'bland'
     lp = LpProgram(equations_str, objective_str, rule=rule)
-    return lp.solve()
+    return lp.solve(), lp.get_assignment()
 
 
-def test_random_lp_dual():
+def test_random_lp_auxiliary():
     pytest.skip()
 #     TODO: Make test_random_lp more general,and then just change the b that we sample to also contain negative numbers
 
-lp_random_tests = [[2, 2],
-                   [4, 2],
+lp_random_tests = [[3, 2],
+                    [20, 2],
+                   [14, 4],
+                   [4, 22],
                    [4, 4],
                    [5, 10],
+                    [50, 30],
                    ]
 
 
 @pytest.mark.parametrize(['num_variables', 'num_equations'], lp_random_tests)
 def test_random_lp(num_variables, num_equations):
-    pytest.skip("Need to detect loop assignments, why does it happen?")
+    # pytest.skip("Need to detect loop assignments, why does it happen?")
     gmodel = Model("test")
     variables = [lp_variable(i, gmodel) for i in range(num_variables)]
     equations_str = []
@@ -78,8 +76,8 @@ def test_random_lp(num_variables, num_equations):
     gmodel.setObjective(gurobi_obj, GRB.MAXIMIZE)
     gmodel.optimize()
 
-    our_objective = solve_our(equations_str, objective_str)
-    print(our_objective)
+    our_objective, our_assignment = solve_our(equations_str, objective_str)
+
     if our_objective == np.inf:
         assert gmodel.status == GRB.UNBOUNDED or gmodel.status == GRB.INF_OR_UNBD
     else:
@@ -87,4 +85,6 @@ def test_random_lp(num_variables, num_equations):
         assert gmodel.status == GRB.OPTIMAL
         gurobi_objective = gmodel.objVal
         print(gurobi_objective)
-        return math.abs(gurobi_objective - our_objective) <= 10**-3
+        for v in variables:
+            np.testing.assert_almost_equal(our_assignment[v.index], v.gurobi_var.x)
+        return np.abs(gurobi_objective - our_objective) <= 10**-3

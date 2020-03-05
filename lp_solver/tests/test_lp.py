@@ -41,6 +41,7 @@ def test_initialize():
 
 @pytest.mark.parametrize('rule', ['bland', 'dantzig'])
 def test_simple_lp(rule):
+    # Lecture 11 Slide 19
     objective = '5x1,4x2,3x3'
     constraints = ['0x0,2x1,3x2,x3<=5', '4x1,x2,2x3<=11', '3x1,4x2,2x3<=8']
     lp = LpProgram(constraints, objective, rule=rule)

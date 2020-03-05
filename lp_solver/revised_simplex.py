@@ -90,7 +90,7 @@ def get_entering_variable_idx(lp_program, bad_vars: Set[int]) -> int:
         y = backward_transformation(eta, y)
 
     y_tag = backward_transformation(lp_program.B, lp_program.Cb)
-    np.testing.assert_almost_equal(y_tag, y)
+    # np.testing.assert_almost_equal(y_tag, y)
     coefs = lp_program.Cn - np.dot(y, lp_program.An)
     variables = lp_program.Xn
 
@@ -101,7 +101,7 @@ def is_unbounded(leaving_var_coefficient: np.ndarray) -> bool:
     return all(leaving_var_coefficient < 0)
 
 
-def get_leaving_variable_idx(lp_program, entering_variable_idx: int) -> Tuple[int, float, np.array]:
+def get_leaving_variable_idx(lp_program, entering_variable_idx: int) -> Tuple[int, float, EtaMatrix]:
     a = lp_program.An[:, entering_variable_idx]
 
     d = np.copy(a)
@@ -112,17 +112,17 @@ def get_leaving_variable_idx(lp_program, entering_variable_idx: int) -> Tuple[in
     np.testing.assert_almost_equal(d, d_tag)
     if is_unbounded(d):
         raise UnboundedException()
-        # TODO: Create exception and raise it (if you are brave enough)
-        # return -1, -1, None
 
     b = lp_program.b
 
     assert any(d != 0)
-    d[d == 0] = 1 / np.inf
+    d_copy = np.copy(d)
+    d[d <= 0] = 1 / np.inf
     # (lecture 12 slide 21)
     t = b / d
     leaving_var = int(np.argmin(t))
-    return leaving_var, t[leaving_var], d
+    eta_d = EtaMatrix(d_copy, leaving_var)
+    return leaving_var, t[leaving_var], eta_d
 
 # def refactorization(B: np.ndarray, etas: List[EtaMatrix]) -> np.ndarray:
 #     '''

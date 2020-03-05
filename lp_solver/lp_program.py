@@ -3,6 +3,7 @@ import re
 from typing import Dict
 import math
 from lp_solver.revised_simplex import *
+import numpy as np
 # from lp_solver import UnboundedException
 
 class Equation(object):
@@ -143,6 +144,7 @@ class LpProgram(object):
                 # if variable not in self.Xn:
                 #     self.Xn = np.append(self.Xn, variable)
                 assert variable < cur_equation.shape[0]
+                # TODO: Multiply by -1
                 cur_equation[variable] = coefficient
 
             # Add row
@@ -186,32 +188,33 @@ class LpProgram(object):
         print(str(Equation(units)))
         print('*' * 100)
 
-    def swap_basis(self, entering_idx, leaving_idx, d):
+    def swap_basis(self, entering_idx, leaving_idx, d_eta):
         self.Xb[leaving_idx], self.Xn[entering_idx] = self.Xn[entering_idx], self.Xb[leaving_idx]
         self.Cb[leaving_idx], self.Cn[entering_idx] = self.Cn[entering_idx], self.Cb[leaving_idx]
 
         t1, t2 = np.copy(self.An[:, entering_idx]), np.copy(self.B[:, leaving_idx])
 
         self.An[:, entering_idx] = self.B[:, leaving_idx]
-        self.etas += [EtaMatrix(d, column_idx=leaving_idx)]
+        self.etas.append(d_eta)
         self.B = np.dot(self.B, self.etas[-1].get_matrix())
 
         np.testing.assert_almost_equal(t1, self.B[:, leaving_idx])
 
-    def get_good_entering_leaving_idx(self):
+    def get_good_entering_leaving_idx(self) -> [int, int, float, EtaMatrix]:
         '''
         Makes sure the eta matrix will not contain very small numbers, to keep numerical stability
         '''
         bad_vars = set()
         entering_idx = get_entering_variable_idx(self, bad_vars)
-        leaving_idx, t, d = get_leaving_variable_idx(self, entering_idx)
+        leaving_idx, t, d_eta = get_leaving_variable_idx(self, entering_idx)
 
-        while entering_idx >= 0 and math.fabs(d[leaving_idx]) <= EPSILON:
+        d_eta_stable = np.bitwise_and(np.abs(d_eta.column) <= EPSILON, d_eta.column != 0)
+        while entering_idx >= 0 and any(d_eta_stable):
             entering_idx = get_entering_variable_idx(self, bad_vars)
-            leaving_idx, t, d = get_leaving_variable_idx(self, entering_idx)
+            leaving_idx, t, d_eta = get_leaving_variable_idx(self, entering_idx)
             bad_vars.add(entering_idx)
 
-        return entering_idx, leaving_idx, t, d
+        return entering_idx, leaving_idx, t, d_eta
 
     def solve(self) -> float:
         # TODO: Implement safegurd (lec. 12 slide 58)
@@ -222,16 +225,16 @@ class LpProgram(object):
             entering_idx = 0  # get_entering_variable_idx(self)
             while entering_idx >= 0:
                 # leaving_idx, t, d = get_leaving_variable_idx(self, entering_idx)
-                entering_idx, leaving_idx, t, d = self.get_good_entering_leaving_idx()
+                entering_idx, leaving_idx, t, d_eta = self.get_good_entering_leaving_idx()
 
                 if entering_idx < 0:
                     break
                 if leaving_idx == -1:
                     return np.inf
 
-                self.swap_basis(entering_idx, leaving_idx, d)
+                self.swap_basis(entering_idx, leaving_idx, d_eta)
                 # Update the assignments
-                self.b -= t * d
+                self.b -= t * d_eta.column
                 self.b[leaving_idx] = t
 
                 # entering_idx = get_entering_variable_idx(self)
@@ -243,3 +246,10 @@ class LpProgram(object):
             return float(np.dot(self.Cb, self.b))
         except UnboundedException:
             return np.inf
+
+    def get_assignment(self):
+        assignment = dict(zip(self.Xb, self.b))
+        assignment_zero = dict(zip(self.Xn, [0] * len(self.Xn)))
+
+        assignment.update(assignment_zero)
+        return assignment
