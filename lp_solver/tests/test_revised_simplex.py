@@ -54,7 +54,7 @@ def test_get_entering_variable_idx(rule):
     lp_program.B = np.array([[3, 1, 0], [1, 1, 0], [4, 3, 1]])
 
     # TODO: Make sure lu works
-    lp_program.etas = lu(lp_program.B)
+    lp_program.l_etas = lu(lp_program.B)
 
     lp_program.An = np.array([[2, 2, 1, 0], [1, 1, 0, 1], [3, 4, 0, 0]])
     lp_program.Xb = np.array([1, 3, 7])

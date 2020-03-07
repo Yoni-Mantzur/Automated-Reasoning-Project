@@ -23,3 +23,16 @@ class EtaMatrix(object):
         eta_matrix[:, self.column_idx] = self.column
 
         return eta_matrix
+
+    @property
+    def T(self):
+        return self.get_matrix().T
+
+    def __mul__(self, other):
+        return np.dot(self.get_matrix(), other.get_matrix())
+
+    def __eq__(self, other):
+        return np.array_equal(self.get_matrix(), other.get_matrix())
+
+    def __hash__(self):
+        return hash(self.get_matrix())

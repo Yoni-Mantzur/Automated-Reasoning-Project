@@ -1,7 +1,9 @@
+from functools import reduce
+
 import numpy as np
 import pytest
 
-from lp_solver.lp_program import LpProgram
+from lp_solver.lp_program import LpProgram, EtaMatrix
 
 
 def test_initialize():
@@ -56,6 +58,12 @@ def test_simple_lp(rule):
     lp = LpProgram(constraints, objective, rule=rule)
     assert lp.solve() == 13
 
+def test_simple_lp3():
+    # Lecture 11 Slide 19 + some
+    objective = '5x1,4x2,3x3,1x4'
+    constraints = ['0x0,2x1,3x2,x3,0.1x4<=5', '4x1,x2,2x3<=11', '3x1,4x2,2x3<=8']
+    lp = LpProgram(constraints, objective, rule='bland')
+    assert lp.solve() == 13
 
 def test_simple_lp2():
     objective = '5x1,4x2,3.1x3'
@@ -63,3 +71,34 @@ def test_simple_lp2():
     lp = LpProgram(constraints, objective, rule='bland')
     lp.solve()
 
+
+
+
+# test_cases = [Bs, Ps, etas]
+
+# @pytest.mark.parametrize(['B', 'P', 'expected_etas'], test_cases)
+def test_refactorize():
+    B = np.array([[2, 0, 0], [4, 1, 0], [3, 0, 1]])
+    # np.array([[1,0,0],[0,1,0],[2,3,0]]),
+    # np.eye(3)]
+    P = [2, 1, 0]
+
+    expected_etas = [EtaMatrix([1, 0.75, 0.5], 0), EtaMatrix([0, 1, 2 / 3], 1),
+             EtaMatrix([4, 1, 0], 0), EtaMatrix([0, -0.75, 1], 1), EtaMatrix([0, 0, -2 / 3], 2)]
+
+    lp = LpProgram()
+
+    l_etas, u_etas, p = lp.refactorize(B)
+
+    assert any((eta == expected_etas[i] for i,eta in enumerate(l_etas + u_etas)))
+
+    l_etas[0] = l_etas[0].get_matrix()
+    u_etas[0] = u_etas[0].get_matrix()
+    l = reduce(lambda a, b: np.dot(a, b.get_matrix()), l_etas)
+    u = reduce(lambda a, b: np.dot(a, b.get_matrix()), u_etas)
+
+    p_mat = np.eye(len(p))
+    for i in range(int(len(p))):
+        p_mat[i,:] = np.eye(len(p))[p[i],:]
+
+    np.testing.assert_almost_equal(np.dot(p_mat, np.dot(l, u.T)), B)

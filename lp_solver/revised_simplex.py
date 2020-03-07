@@ -91,11 +91,19 @@ def forward_transformation(B: Union[EtaMatrix, np.ndarray], a: np.ndarray) -> np
 
 def get_entering_variable_idx(lp_program, bad_vars: Set[int]) -> int:
     y = lp_program.Cb
-    for eta in lp_program.etas[::-1]:
+    for eta in lp_program.u_etas:
+        y = forward_transformation(eta, y)
+    for eta in lp_program.l_etas[::-1]:
         y = backward_transformation(eta, y)
 
-    # y_tag = backward_transformation(lp_program.B, lp_program.Cb)
-    # np.testing.assert_almost_equal(y_tag, y)
+    p_mat = np.eye(len(lp_program.p))
+    for i in range(int(len(lp_program.p))):
+        p_mat[i,:] = np.eye(len(lp_program.p))[lp_program.p[i],:]
+
+    y = np.dot(y, np.linalg.inv(p_mat))
+
+    y_tag = backward_transformation(lp_program.B, lp_program.Cb)
+    np.testing.assert_almost_equal(y_tag, y)
     coefs = lp_program.Cn - np.dot(y, lp_program.An)
     variables = lp_program.Xn
 
@@ -113,7 +121,7 @@ def get_leaving_variable_idx(lp_program, entering_variable_idx: int) -> Tuple[in
     a = lp_program.An[:, entering_variable_idx]
 
     d = np.copy(a)
-    for eta in lp_program.etas:
+    for eta in lp_program.l_etas:
         d = forward_transformation(eta, d)
     d_tag = forward_transformation(lp_program.B, a)
 
@@ -138,13 +146,3 @@ def get_leaving_variable_idx(lp_program, entering_variable_idx: int) -> Tuple[in
     eta_d = EtaMatrix(d_copy, leaving_var)
     return leaving_var, t[leaving_var], eta_d
 
-# def refactorization(B: np.ndarray, etas: List[EtaMatrix]) -> np.ndarray:
-#     '''
-#     Create a fresh basis out of the current basis and a list of transformations
-#     :param B: previous basis
-#     :param etas: list of transformations
-#     :return: fresh basis
-#     '''
-#     for e in etas:
-#         B = np.dot(B, e)
-#

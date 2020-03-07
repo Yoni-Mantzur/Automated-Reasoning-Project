@@ -2,12 +2,15 @@ import enum
 import re
 from copy import copy
 from typing import Dict, Optional
-
+import numpy as np
 from lp_solver.UnboundedException import InfeasibleException
 from lp_solver.revised_simplex import *
 
 
 EPSILON = 10 ** -4
+
+# from lp_solver import UnboundedException
+FACTORIZATION_TH = 2
 
 
 class Equation(object):
@@ -115,7 +118,8 @@ class LpProgram(object):
         self.is_aux = is_aux
         self.need_solve_auxiliry = False
         self.B = np.array([[]])  # type: np.ndarray
-        self.etas = []  # type: List[EtaMatrix]
+        self.l_etas = []  # type: List[EtaMatrix]
+        self.u_etas = []  # type: List[EtaMatrix]
         self.Xb = np.array([])  # type: np.ndarray
 
         # Non-basic coefficients and variables
@@ -135,6 +139,7 @@ class LpProgram(object):
         if objective:
             self._create_objective(objective)
 
+        self.p = np.arange(len(self.B))  # type: np.ndarray
         from functools import partial
         rules = {'dantzig': dantzig_rule, 'bland': blands_rule}
 
@@ -233,8 +238,8 @@ class LpProgram(object):
         t1, t2 = np.copy(self.An[:, entering_idx]), np.copy(self.B[:, leaving_idx])
 
         self.An[:, entering_idx] = self.B[:, leaving_idx]
-        self.etas.append(d_eta)
-        self.B = np.dot(self.B, self.etas[-1].get_matrix())
+        self.l_etas.append(d_eta)
+        self.B = np.dot(self.B, self.l_etas[-1].get_matrix())
 
         # np.testing.assert_almost_equal(t1, self.B[:, leaving_idx])
 
@@ -262,6 +267,7 @@ class LpProgram(object):
     def solve(self) -> Optional[float]:
         # TODO: Implement refactorization
         # TODO: Connect LP to the SMT solver  ???
+        iteration = 0
         try:
             entering_idx = 0  # get_entering_variable_idx(self)
             while entering_idx >= 0:
@@ -280,8 +286,14 @@ class LpProgram(object):
                 self.b[leaving_idx] = t
 
                 # entering_idx = get_entering_variable_idx(self)
+                iteration += 1
 
-                if self.safeguard():
+                # TODO: Do we need to extract the actual assignment (for the real variables)?
+            # y = backward_transformation(self.B, self.Cb)
+            # coefs = self.Cn - np.dot(y, self.An)
+            # np.dot(self.b, coefs) +
+
+                if self.safeguard() or iteration % FACTORIZATION_TH == 0:
                     self.refactorize()
             return float(np.dot(self.Cb, self.b))
         except UnboundedException:
@@ -300,7 +312,39 @@ class LpProgram(object):
         # TODO: Is np.dot(B,b) is to expensive and we should build from the eta matrices?
         return not np.allclose(np.dot(self.B, self.b), self.initial_b, atol=EPSILON)
 
-    def refactorize(self):
+    def refactorize(self, B = None):
         from scipy.linalg import lu
-        (p, l, u) = lu(self.B)
+        from scipy import sparse
+
+        # for testing
+        B = B if B is not None else self.B
+
+        p, l, u = lu(B)
+
+        basic_size = len(B)
+        self.B = np.eye(basic_size)
+
+        Li, Ui = [], []
+        eye = np.eye(basic_size)
+        for i in range(basic_size):
+            # avoid degenerate etas
+            id_column = eye[i]
+
+            # L is lower triangular
+            if not np.array_equal(id_column, l[:, i]):
+                Li += [EtaMatrix(l[:,i], i)]
+
+            # U is upper triangular
+            if not np.array_equal(id_column, u.T[:,i]):
+                Ui += [EtaMatrix(u.T[:,i], i)]
+
+        self.l_etas = Li
+        self.u_etas = Ui
+
+        # p maps each row to the pivoted raw
+        _, self.p, v = sparse.find(p)
+        assert np.array_equal(v, np.ones(len(v)))
+
+        return Li, Ui, self.p
+
 
