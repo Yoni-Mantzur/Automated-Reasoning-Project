@@ -38,6 +38,14 @@ def test_initialize():
 #     lp = LpProgram(constraints, objective, rule='Dantzig')
 #     assert lp.solve == 13
 
+@pytest.mark.parametrize('rule', ['dantzig', 'bland'])
+def test_auxiliry_lp(rule):
+    # HW3 Q1
+    objective = 'x1,3x2'
+    constraints = ['-1x1,x2<=-1', '-2x1,-2x2<=-6', '-1x1,4x2<=2']
+    lp = LpProgram(constraints, objective, rule=rule)
+    assert lp.solve() == np.inf
+
 
 @pytest.mark.parametrize('rule', ['bland', 'dantzig'])
 def test_simple_lp(rule):

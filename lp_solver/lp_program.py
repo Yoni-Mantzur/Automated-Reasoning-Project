@@ -1,9 +1,13 @@
 import enum
 import re
 from typing import Dict
-import math
-from lp_solver.revised_simplex import *
+
 import numpy as np
+
+from lp_solver.UnboundedException import InfeasibleException
+from lp_solver.revised_simplex import *
+
+
 # from lp_solver import UnboundedException
 
 class Equation(object):
@@ -85,9 +89,11 @@ class Equation(object):
 
 class LpProgram(object):
     def __init__(self, equations: List[Union[Equation, str]] = None, objective: Union[Equation, str] = None,
-                 rule: str = 'Dantzig'):
+                 rule: str = 'Dantzig', is_aux=False):
         # Basis, coefficients and variables
         # self.B = [] # type: # List[EtaMatrix]
+        self.is_aux = is_aux
+        self.need_solve_auxiliry = False
         self.B = np.array([[]])  # type: np.ndarray
         self.etas = []  # type: List[EtaMatrix]
         self.Xb = np.array([])  # type: np.ndarray
@@ -102,15 +108,28 @@ class LpProgram(object):
         if equations:
             self._add_equations(equations)
 
+
         # Objective coefficients for basic and non basic variables
         self.Cb = None
         self.Cn = None
         if objective:
             self._create_objective(objective)
 
-        rules = {'dantzig': dantzig_rule,
-                 'bland': blands_rule}
+        from functools import partial
+        rules = {'dantzig': dantzig_rule, 'bland': blands_rule}
+
         self.rule = rules.get(rule.lower(), rules['dantzig'])
+        self.initial_b = np.copy(self.b)
+
+        if self.need_solve_auxiliry:
+            lp_aux = LpProgram(equations, objective='-1x0', is_aux=True)
+            aux_obj = lp_aux.solve()
+            assert aux_obj != np.inf
+            if aux_obj != 0:
+                raise InfeasibleException
+
+            self.initialize_from_auxiliry(lp_aux)
+            self.need_solve_auxiliry = False
 
     def _create_objective(self, objective: Union[Equation, str]):
         if isinstance(objective, str):
@@ -123,6 +142,24 @@ class LpProgram(object):
             assert v <= len(self.Cn), "There is an unbounded variable"
             self.Cn[v] = c
 
+    def initialize_from_auxiliry(self, lp_aux: 'LpProgram'):
+        assignment = lp_aux.get_assignment()
+        # Pivot to the assignment basis
+        entering_vars = set(assignment.keys()) - set(self.Xb)
+        leaving_vars = set(self.Xb) - set(assignment.keys())
+        # self.B = lp_aux.B
+        # self.etas = lp_aux.etas
+        self.b = lp_aux.b
+
+        for e,l in zip(entering_vars, leaving_vars):
+            e_idx, l_idx = int(np.where(self.Xn == e)[0]), int(np.where(self.Xb == l)[0])
+            d_eta = EtaMatrix(self.An[:, e_idx], l_idx)
+
+            self.swap_basis(e_idx, l_idx, d_eta)
+
+            self.b[l_idx] = assignment[self.Xb[l_idx]]
+        return
+
     def _add_equations(self, equations: List[Union[Equation, str]]) -> None:
         n = -1  # Number of variables
         m = len(equations)  # Number of equations
@@ -132,7 +169,8 @@ class LpProgram(object):
                 equation = Equation.get_equation(equation)
             assert isinstance(equation, Equation)
             equations[i] = equation
-
+            if self.is_aux:
+                equations[i].units.update({0: -1})
             if equation.max_variable_index > n:
                 n = equation.max_variable_index + 1
                 self.Xn = list(range(n))
@@ -141,17 +179,14 @@ class LpProgram(object):
         for i, equation in enumerate(equations):
             cur_equation = np.zeros(shape=(n,))
             for variable, coefficient in equation.units.items():
-                # if variable not in self.Xn:
-                #     self.Xn = np.append(self.Xn, variable)
                 assert variable < cur_equation.shape[0]
-                # TODO: Multiply by -1
                 cur_equation[variable] = coefficient
 
             # Add row
             self.An[i, :] = cur_equation
-            if equation.scalar < 0:
-                # The assignment x=0 is not feasible, need to first solve the dual problem
-                raise NotImplementedError()
+            if equation.scalar < 0 and not self.is_aux:
+                self.need_solve_auxiliry = True
+
             self.b = np.append(self.b, equation.scalar)
 
         # Create the basic variables
@@ -198,16 +233,21 @@ class LpProgram(object):
         self.etas.append(d_eta)
         self.B = np.dot(self.B, self.etas[-1].get_matrix())
 
-        np.testing.assert_almost_equal(t1, self.B[:, leaving_idx])
+        # np.testing.assert_almost_equal(t1, self.B[:, leaving_idx])
 
     def get_good_entering_leaving_idx(self) -> [int, int, float, EtaMatrix]:
         '''
         Makes sure the eta matrix will not contain very small numbers, to keep numerical stability
         '''
         bad_vars = set()
-        entering_idx = get_entering_variable_idx(self, bad_vars)
+        if self.is_aux:
+            entering_idx = 0 #int(np.where(self.Xn == 0)[0])
+            assert self.Xn[entering_idx] == 0
+        else:
+            entering_idx = get_entering_variable_idx(self, bad_vars)
         leaving_idx, t, d_eta = get_leaving_variable_idx(self, entering_idx)
 
+        self.is_aux = False
         d_eta_stable = np.bitwise_and(np.abs(d_eta.column) <= EPSILON, d_eta.column != 0)
         while entering_idx >= 0 and any(d_eta_stable):
             entering_idx = get_entering_variable_idx(self, bad_vars)
@@ -217,9 +257,7 @@ class LpProgram(object):
         return entering_idx, leaving_idx, t, d_eta
 
     def solve(self) -> float:
-        # TODO: Implement safegurd (lec. 12 slide 58)
         # TODO: Implement refactorization
-        # TODO: Initial solution (check if the zero vector is valid if not solve it)
         # TODO: Connect LP to the SMT solver  ???
         try:
             entering_idx = 0  # get_entering_variable_idx(self)
@@ -243,13 +281,25 @@ class LpProgram(object):
             # y = backward_transformation(self.B, self.Cb)
             # coefs = self.Cn - np.dot(y, self.An)
             # np.dot(self.b, coefs) +
+
+            if self.safeguard():
+                self.refactorize()
             return float(np.dot(self.Cb, self.b))
         except UnboundedException:
             return np.inf
+        except InfeasibleException:
+            return None
 
     def get_assignment(self):
         assignment = dict(zip(self.Xb, self.b))
-        assignment_zero = dict(zip(self.Xn, [0] * len(self.Xn)))
-
-        assignment.update(assignment_zero)
+        # assignment_zero = dict(zip(self.Xn, [0] * len(self.Xn)))
+        #
+        # assignment.update(assignment_zero)
         return assignment
+
+    def safeguard(self):
+        return not np.allclose(np.dot(self.B, self.b), self.initial_b, atol=EPSILON)
+
+    def refactorize(self):
+        from scipy.linalg import lu
+        (p, l, u) = lu(self.B)

@@ -21,15 +21,18 @@ def extract_legal_coefficients(rule: Callable[[Union[np.ndarray, List[float]], U
 
         # Zero tolerance
         if np.max(coefficients) <= EPSILON and set(variables) == bad_vars:
+            # TODO: Remove
+            print("OOPS")
             return -1
 
         # Remove bad variables: i.e. given or with negative coefficient
         # TODO: Sorry Yoni the zip(*filter()) does not work
         # filtered_coeffs, filtered_vars = zip(
-        #     *(filter(lambda unit: unit[0] > 0 and unit[1] not in bad_vars, zip(coefficients, variables))))
+            #     *(filter(lambda unit: unit[0] > 0 and unit[1] not in bad_vars, zip(coefficients, variables))))
+        op = lambda x: x > 0
         filtered_coeffs, filtered_vars = [], []
         for c, v in zip(coefficients, variables):
-            if c > 0 and v not in bad_vars:
+            if op(c) and v not in bad_vars:
                 filtered_coeffs.append(c)
                 filtered_vars.append(v)
         if len(filtered_coeffs) == 0:
@@ -46,15 +49,17 @@ def extract_legal_coefficients(rule: Callable[[Union[np.ndarray, List[float]], U
 
 
 @extract_legal_coefficients
-def blands_rule(_: Union[np.ndarray, List[float]], variables: Union[np.ndarray, List[int]]) -> int:
+def blands_rule(_: Union[np.ndarray, List[float]],
+                variables: Union[np.ndarray, List[int]]) -> int:
     return int(np.min(variables))
 
 
 @extract_legal_coefficients
-def dantzig_rule(coefficients: Union[np.ndarray, List[float]], variables: Union[np.ndarray, List[int]]) -> int:
+def dantzig_rule(coefficients: Union[np.ndarray, List[float]],
+                 variables: Union[np.ndarray, List[int]]) -> int:
     # TODO: Break tie in coefficients using smaller index (from variables)
     # TODO: add test
-    return variables[np.argmax(coefficients)]
+    return variables[np.argmax(np.abs(coefficients))]
 
 
 def backward_transformation(B: Union[EtaMatrix, np.ndarray], Cb: np.ndarray) -> np.ndarray:
@@ -89,7 +94,7 @@ def get_entering_variable_idx(lp_program, bad_vars: Set[int]) -> int:
     for eta in lp_program.etas[::-1]:
         y = backward_transformation(eta, y)
 
-    y_tag = backward_transformation(lp_program.B, lp_program.Cb)
+    # y_tag = backward_transformation(lp_program.B, lp_program.Cb)
     # np.testing.assert_almost_equal(y_tag, y)
     coefs = lp_program.Cn - np.dot(y, lp_program.An)
     variables = lp_program.Xn
@@ -97,8 +102,11 @@ def get_entering_variable_idx(lp_program, bad_vars: Set[int]) -> int:
     return lp_program.rule(coefs, variables, bad_vars)
 
 
-def is_unbounded(leaving_var_coefficient: np.ndarray) -> bool:
-    return all(leaving_var_coefficient < 0)
+def is_unbounded(leaving_var_coefficient: np.ndarray, is_max: bool) -> bool:
+    if is_max:
+        return all(leaving_var_coefficient < 0)
+    else:
+        return all(leaving_var_coefficient > 0)
 
 
 def get_leaving_variable_idx(lp_program, entering_variable_idx: int) -> Tuple[int, float, EtaMatrix]:
@@ -108,19 +116,25 @@ def get_leaving_variable_idx(lp_program, entering_variable_idx: int) -> Tuple[in
     for eta in lp_program.etas:
         d = forward_transformation(eta, d)
     d_tag = forward_transformation(lp_program.B, a)
-    # assert np.array_equal(d, d_tag)
+
     np.testing.assert_almost_equal(d, d_tag)
-    if is_unbounded(d):
+    if is_unbounded(d, is_max=not lp_program.is_aux):
         raise UnboundedException()
 
     b = lp_program.b
 
     assert any(d != 0)
     d_copy = np.copy(d)
-    d[d <= 0] = 1 / np.inf
-    # (lecture 12 slide 21)
+    d[d == 0] = 1 / np.inf
+
+    # lecture 12 slide 21 (point 4): max t s.t. t * d <= b (i.e. if d <= 0 things get messy)
     t = b / d
+    # d is minus so we negated the equation --> got opposite operation(<=/>=) need to re negate it
+    t[d < 0] = t[d < 0] * -1
+
     leaving_var = int(np.argmin(t))
+
+    t = b / d
     eta_d = EtaMatrix(d_copy, leaving_var)
     return leaving_var, t[leaving_var], eta_d
 
