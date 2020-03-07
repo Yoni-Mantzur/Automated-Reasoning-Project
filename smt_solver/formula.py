@@ -188,6 +188,7 @@ class EquationTerm(Term):
     def get_str_original(self) -> str:
         return '%s=%s' % (str(self.lhs), str(self.rhs))
 
+
 class Formula(object):
     def __init__(self):
         self.sat_formula = None  # type: SatFormula
@@ -294,7 +295,9 @@ class Formula(object):
 
     def conflict(self, partial_assignment: Dict[Variable, bool]) -> List[Literal]:
         '''
-        Assuming there is a conflict in the current assignment and returns the clause which casues it
+        Check if there is a conflict, is so return the reason clause (as a list of literals) which is a negation of the
+        current assignment
+        otherwise, empty list
         :param partial_assignment:
         :return:
         '''

@@ -111,17 +111,6 @@ class CnfFormula(object):
         return str(self)
 
     def add_clause(self, literals: List[Literal]) -> None:
-        # TODO: when using this dont forget to update the watch_literals
-        # if literals and isinstance(literals[0], str):
-        #     # parse literals to clause
-        #     new_literals = []
-        #     for literal in literals:
-        #         negated = True if literal[0] == Operator.NEGATION else False
-        #         literal = literal[1:] if negated else literal
-        #         new_literals.append(Literal.from_name(literal, negated))
-        #
-        #     literals = list(new_literals)
-
         self.clauses += [literals]
         for lit in literals:
             self.literal_to_clauses[lit].add(len(self.clauses) - 1)
@@ -160,7 +149,4 @@ class CnfFormula(object):
                 return None
             if l.variable not in assignments:
                 return l
-        # # TODO: Might be helpful to keep the literal that apperas the most (for the decision heuristic)
-        # return keywithmaxval(self.literal_to_clauses)
-
 

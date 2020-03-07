@@ -5,7 +5,8 @@ from lp_solver.lp_program import LpProgram
 
 
 def test_initialize():
-    matrix_str = ["4x1,5x2,-6x3>=1", "4x3,5x0>=2", "3.1x1,1.1x2>=0"]
+    # matrix_str = ["4x1,5x2,-6x3>=1", "4x3,5x0>=2", "3.1x1,1.1x2>=0"]
+    matrix_str = ["4x1,5x2,-6x3<=1", "4x3,5x0<=2", "3.1x1,1.1x2<=0"]
     objective_str = "2x1,-3x2,0x3"
     non_basic_variables = [0, 1, 2, 3]
     matrix = np.array([

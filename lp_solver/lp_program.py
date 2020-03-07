@@ -1,14 +1,14 @@
 import enum
 import re
-from typing import Dict
-
-import numpy as np
+from copy import copy
+from typing import Dict, Optional
 
 from lp_solver.UnboundedException import InfeasibleException
 from lp_solver.revised_simplex import *
 
 
-# from lp_solver import UnboundedException
+EPSILON = 10 ** -4
+
 
 class Equation(object):
     class Type(enum.Enum):
@@ -51,7 +51,27 @@ class Equation(object):
         self.type = Equation.Type(t)
         self.scalar = float(rhs)
 
-        # TODO: Turn into normal form, i.e. transform the types into LE
+        # We are assuming getting the equations in LE format
+        assert self.type == Equation.Type.LE
+
+    def negate(self, do_copy=True):
+        if do_copy:
+            new_equation = copy(self)
+        else:
+            new_equation = self
+
+        if new_equation.type == Equation.Type.LE:
+            # not(x <= 4) <--> x > 4 <--> x >= 4.0001
+            new_equation.type = Equation.Type.GE
+            new_equation.scalar += EPSILON
+        elif new_equation.type == Equation.Type.GE:
+            # not(x >= 5) <--> x < 5 <--> x <= 4.999
+            new_equation.type = Equation.Type.LE
+            new_equation.scalar -= EPSILON
+        else:
+            raise NotImplementedError()
+
+        return new_equation
 
     @staticmethod
     def get_equation(equation_str: str) -> 'Equation':
@@ -68,9 +88,9 @@ class Equation(object):
     def __str__(self):
         units_str = ''
         for v, c in self.units.items():
-            # if c != 0:
-            sign = ('+' if c > 0 else '')
-            units_str += '%s%.2fx%d' % (sign, c, v)
+            if c != 0:
+                sign = ('+' if c > 0 else '')
+                units_str += '%s%.2fx%d' % (sign, c, v)
 
         if self.scalar:
             return '%s %s %.2f' % (units_str, self.type.value, self.scalar)
@@ -123,7 +143,9 @@ class LpProgram(object):
 
         if self.need_solve_auxiliry:
             lp_aux = LpProgram(equations, objective='-1x0', is_aux=True)
+
             aux_obj = lp_aux.solve()
+
             assert aux_obj != np.inf
             if aux_obj != 0:
                 raise InfeasibleException
@@ -171,7 +193,7 @@ class LpProgram(object):
             equations[i] = equation
             if self.is_aux:
                 equations[i].units.update({0: -1})
-            if equation.max_variable_index > n:
+            if equation.max_variable_index >= n:
                 n = equation.max_variable_index + 1
                 self.Xn = list(range(n))
 
@@ -179,7 +201,7 @@ class LpProgram(object):
         for i, equation in enumerate(equations):
             cur_equation = np.zeros(shape=(n,))
             for variable, coefficient in equation.units.items():
-                assert variable < cur_equation.shape[0]
+                assert variable < cur_equation.shape[0], "var: {}, cur_equation.shape[0]: {}".format(variable, cur_equation.shape[0])
                 cur_equation[variable] = coefficient
 
             # Add row
@@ -203,25 +225,6 @@ class LpProgram(object):
                    self.Xb.shape, self.Xb, self.An.shape, self.An, self.Xn.shape,
                    self.Xn,
                    self.Cb.shape, self.Cb, self.Cn.shape, self.Cn, self.b.shape, self.b)
-
-    def dump(self):
-        print("Lp program:")
-        print('*' * 100)
-
-        print("Equations:")
-        variables = np.append(self.Xn, self.Xn)
-        for i, coefs in enumerate(np.append(self.An, self.B, axis=1)):
-            units = {c: v for c, v in zip(variables, coefs)}
-            scalar = self.b[i]
-            print(str(Equation(units=units, scalar=scalar)))
-
-        print("Objective:")
-        variables = np.append(self.Xn, self.Xb)
-        coefs = np.append(self.Cn, self.Cb)
-        units = {c: v for c, v in zip(variables, coefs)}
-
-        print(str(Equation(units)))
-        print('*' * 100)
 
     def swap_basis(self, entering_idx, leaving_idx, d_eta):
         self.Xb[leaving_idx], self.Xn[entering_idx] = self.Xn[entering_idx], self.Xb[leaving_idx]
@@ -256,7 +259,7 @@ class LpProgram(object):
 
         return entering_idx, leaving_idx, t, d_eta
 
-    def solve(self) -> float:
+    def solve(self) -> Optional[float]:
         # TODO: Implement refactorization
         # TODO: Connect LP to the SMT solver  ???
         try:
@@ -273,17 +276,13 @@ class LpProgram(object):
                 self.swap_basis(entering_idx, leaving_idx, d_eta)
                 # Update the assignments
                 self.b -= t * d_eta.column
+
                 self.b[leaving_idx] = t
 
                 # entering_idx = get_entering_variable_idx(self)
 
-            # TODO: Do we need to extract the actual assignment (for the real variables)?
-            # y = backward_transformation(self.B, self.Cb)
-            # coefs = self.Cn - np.dot(y, self.An)
-            # np.dot(self.b, coefs) +
-
-            if self.safeguard():
-                self.refactorize()
+                if self.safeguard():
+                    self.refactorize()
             return float(np.dot(self.Cb, self.b))
         except UnboundedException:
             return np.inf
@@ -298,8 +297,10 @@ class LpProgram(object):
         return assignment
 
     def safeguard(self):
+        # TODO: Is np.dot(B,b) is to expensive and we should build from the eta matrices?
         return not np.allclose(np.dot(self.B, self.b), self.initial_b, atol=EPSILON)
 
     def refactorize(self):
         from scipy.linalg import lu
         (p, l, u) = lu(self.B)
+

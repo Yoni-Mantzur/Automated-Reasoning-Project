@@ -15,7 +15,7 @@ class DPLL(object):
                  propagate_helper: Callable[[Dict[Variable, bool]], Optional[Dict[Variable, bool]]] = None,
                  conflict_helper:  Callable[[Dict[Variable, bool]], List[Literal]] = None, rec_num=None):
         self._assignment = partial_assignment or [{}]
-        self.watch_literals = watch_literals or defaultdict(list)
+        self.watch_literals = watch_literals or defaultdict(set)
         self.implication_graph = implication_graph or ImplicationGraph(cnf_formula)  # implication_graph or {}
         self.rec_num = rec_num or None
 
@@ -50,14 +50,14 @@ class DPLL(object):
         if len(clause) == 0:
             return
         if len(clause) == 1:
-            self.watch_literals[clause[0]].append(cluse_idx)
+            self.watch_literals[clause[0]].add(cluse_idx)
             return
         first_lit = randint(0, len(clause) - 1)
         second_lit = first_lit
         while second_lit == first_lit:
             second_lit = randint(0, len(clause) - 1)
-        self.watch_literals[clause[first_lit]].append(cluse_idx)
-        self.watch_literals[clause[second_lit]].append(cluse_idx)
+        self.watch_literals[clause[first_lit]].add(cluse_idx)
+        self.watch_literals[clause[second_lit]].add(cluse_idx)
 
     def get_full_assignment(self) -> Dict[Variable, bool]:
         # if self.unsat is None or self.unsat is True:
@@ -141,7 +141,7 @@ class DPLL(object):
 
             if clause_unsatisfied:
                 # all literals are already assigned, this clause will not be satisfied
-                return self.watch_literals[not_lit][i]
+                return clause
 
         return None
 
@@ -163,22 +163,17 @@ class DPLL(object):
             other_watch = None
             for lit in self.formula.clauses[sub_formula_idx]:
                 if lit.variable not in self._assignment[-1]:
-                    # TODO: Try to avoid this O(n)
                     if sub_formula_idx in self.watch_literals[lit]:
                         other_watch = lit
                     else:
                         # No hope, there is at least one variable that is not assigned and is not the watch,
                         # set it as the new watch_literal
                         hope = False
-                        self.watch_literals[lit].append(sub_formula_idx)
+                        self.watch_literals[lit].add(sub_formula_idx)
                         break
             # only other_watch and the current assigned literal are not assigned, assign the other_watch
             if other_watch is not None and hope:
                 learn_assingments.append((other_watch, sub_formula_idx))
-        #  TODO: Whats going on here? might be that we didn't find other_watch
-        # for c in self.watch_literals[n_literal]:
-        #     if len([(k, v) for k, v in self.watch_literals.items() if c in v]) != 3:
-        #         print('DEBUG')
         del self.watch_literals[n_literal]
         if self.formula is None or self.formula.clauses == [[]]:
             return self.formula
@@ -196,7 +191,7 @@ class DPLL(object):
             return None
 
         found = True
-        while found == True:
+        while found:
             found = False
             for i, sub_forumla in enumerate(self.formula.clauses):
                  if len(sub_forumla) == 1:
@@ -207,21 +202,6 @@ class DPLL(object):
                     self._unit_propagation_watch_literals(lit)
                     if self.formula is None:
                         return self.formula
-
-        # for i, clause in enumerate(self.formula.clauses):
-        #     clause_unsatisfied = True
-        #     for lit in clause:
-        #         if lit.name not in self._assignment[-1]:
-        #             # One of the literals in the clause is assigned, skip to next clause
-        #             clause_unsatisfied = False
-        #             break
-        #         else:
-        #             # Make sure there is no True assignment that we forgot to delete
-        #             assert self._assignment[-1][lit.name] == lit.negated
-        #
-        #     if clause_unsatisfied:
-        #         # all literals are already assigned, this clause will not be satisfied
-        #         return None
 
         return self.formula
 

@@ -47,7 +47,7 @@ lp_random_tests_aux = [
 ]
 
 
-@pytest.mark.timeout(40)
+@pytest.mark.timeout(15)
 @pytest.mark.parametrize(['num_variables', 'num_equations'], lp_random_tests_aux)
 def test_random_lp_auxiliary(num_variables, num_equations):
     return run_one_compare(num_variables, num_equations)
@@ -58,7 +58,7 @@ lp_random_tests = [[3, 2], [20, 2], [5, 4], [7, 4], [4, 2], [4, 4], [5, 3]]
                  #  ]
 
 
-@pytest.mark.timeout(40)
+@pytest.mark.timeout(15)
 @pytest.mark.parametrize(['num_variables', 'num_equations'], lp_random_tests)
 def test_random_lp(num_variables, num_equations):
     return run_one_compare(num_variables, num_equations, constraint_scalar_sample=partial(uniform, a=0, b=1))
