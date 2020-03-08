@@ -16,12 +16,12 @@ def test_single_variable():
     assert get_result(s)
 
 def test_simple_sat():
-    s = '(x1&x2)|(~x1&~x2)'
+    s = '((x1&x2)|(~x1&~x2))'
     assert get_result(s)
 
 def test_simple_unsat():
     s = '(x1&~x1)'
     assert not get_result(s)
 
-    s = '(x1&x2)&(~x1&~x2)'
+    s = '((x1&x2)&(~x1&~x2))'
     assert get_result(s)
