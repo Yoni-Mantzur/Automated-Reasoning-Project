@@ -53,6 +53,7 @@ def preprocess_from_sat(formula: SatFormula) -> CnfFormula:
     clauses = tseitins_transformation(formula)
     return preprocess(CnfFormula(clauses))
 
+
 def preprocess(formula: CnfFormula) -> CnfFormula:
     formula = remove_redundant_literals(formula)
     formula = delete_trivial_clauses(formula)

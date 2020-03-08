@@ -1,4 +1,3 @@
-
 from smt_solver.formula import Formula
 
 
@@ -13,6 +12,7 @@ def test_simple():
     print(assignment)
     assert res
 
+
 def test_same_literals():
     f = Formula.from_str('((x=y|~f(x)=f(z))&x=y)')
     print(f.sat_formula)
@@ -20,12 +20,14 @@ def test_same_literals():
     print(assignment)
     assert res
 
+
 def test_complicated_transitions():
     f = Formula.from_str('(((x=y&x=f(x))&f(x)=r(z))&r(z)=y)')
     print(f.sat_formula)
     res, assignment = f.solve()
     print(assignment)
     assert res
+
 
 def test_complex():
     f = Formula.from_str('((g(a)=c&(~f(g(a))=f(c)|g(a)=d))&~c=d)')
@@ -37,6 +39,7 @@ def test_complex():
     res, assignment = f.solve()
     print(assignment)
     assert res
+
 
 def test_implies():
     f = Formula.from_str('((g(a)=b&g(b)=a)->b=a)')
@@ -51,13 +54,6 @@ def test_implies():
     print(assignment)
     assert res
 
-def test1():
-    s = '((((((a0=f0(a0)&a0=f0(a0))|a1=f1(a1))&f0(a0)=f0(a0))|~a0=f0(a0))&~f0(a0)=f0(a0))|a0=a0)'
-    f = Formula.from_str(s)
-    print(f.sat_formula)
-    res, assignment = f.solve()
-    print(assignment)
-    assert res
 
 def test_iff():
     # a=b iff f(a) = f(b), SAT for example a=b & f=identity function
@@ -66,6 +62,7 @@ def test_iff():
     res, assignment = f.solve()
     print(assignment)
     assert res
+
 
 def test_multi_variable_function():
     # a=x & b=y & f(a,b,c) = g(a,b,c) &f(a,b,c) != g(x,y,z) -> SAT since z!=c
@@ -81,6 +78,7 @@ def test_multi_variable_function():
     res, assignment = f.solve()
     print(assignment)
     assert not res
+
 
 if __name__ == "__main__":
     test_implies()

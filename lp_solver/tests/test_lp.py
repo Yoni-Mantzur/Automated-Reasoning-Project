@@ -7,7 +7,6 @@ from lp_solver.lp_program import LpProgram, EtaMatrix
 
 
 def test_initialize():
-    # matrix_str = ["4x1,5x2,-6x3>=1", "4x3,5x0>=2", "3.1x1,1.1x2>=0"]
     matrix_str = ["4x1,5x2,-6x3<=1", "4x3,5x0<=2", "3.1x1,1.1x2<=0"]
     objective_str = "2x1,-3x2,0x3"
     non_basic_variables = [0, 1, 2, 3]
@@ -31,15 +30,7 @@ def test_initialize():
     objective_basic = np.zeros(shape=len(basic_variables))
     assert np.array_equal(lp.Cb, objective_basic)
     assert np.array_equal(lp.Cn, objective_non_basic)
-    # lp.dump()
-    # print(lp)
 
-
-# def test_simple_lp():
-#     objective = '5x1,4x2,3x3'
-#     constraints = ['2x1,3x2,x3<=5', '4x1,x2,2x3<=11', '3x1,4x2,2x3<=8']
-#     lp = LpProgram(constraints, objective, rule='Dantzig')
-#     assert lp.solve == 13
 
 @pytest.mark.parametrize('rule', ['dantzig', 'bland'])
 def test_auxiliry_lp(rule):
@@ -76,7 +67,7 @@ def test_simple_lp2():
 
 Bs = [np.array([[2, 0, 0], [4, 1, 0], [3, 0, 1]])]
 Ps = [[2, 1, 0]]
-etas = [[EtaMatrix([1, 0.75, 0.5], 0), EtaMatrix([0, 1, 2 / 3], 1), EtaMatrix([4, 1, 0], 0),\
+etas = [[EtaMatrix([1, 0.75, 0.5], 0), EtaMatrix([0, 1, 2 / 3], 1), EtaMatrix([4, 1, 0], 0), \
          EtaMatrix([0, -0.75, 1], 1), EtaMatrix([0, 0, -2 / 3], 2)]]
 
 test_cases = [[b, p, e] for b, p, e in zip(Bs, Ps, etas)]

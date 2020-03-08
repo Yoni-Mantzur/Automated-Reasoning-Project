@@ -1,9 +1,8 @@
-from random import random, sample, seed, randint, choices
+from random import random, sample, choices
 from timeit import default_timer as timer
 from typing import List
 
 import pytest
-from tqdm import tqdm
 from z3 import Bool, Solver, Or, Not, sat
 
 from sat_solver.DPLL import DPLL
@@ -76,31 +75,10 @@ def perform_test(clauses: List[List[Literal]], debug=False):
 
 
 random_sat = [[50, 20, 10], [100, 40, 39], [100, 50, 40], [120, 50, 21], [150, 51, 50]] \
-             + choices([[f,v,c] for f in range(2,10)  for c in range(2,f) for v in range(2,10)],k=100)
+             + choices([[f, v, c] for f in range(2, 10) for c in range(2, f) for v in range(2, 10)], k=100)
 
-@pytest.mark.parametrize(['num_variables',  'num_clauses', 'clause_length'], random_sat)
+
+@pytest.mark.parametrize(['num_variables', 'num_clauses', 'clause_length'], random_sat)
 def test_random_sat(num_variables, num_clauses, clause_length):
     clauses = create_random_query(num_variables, num_clauses, clause_length)
     perform_test(clauses, False)
-
-# if __name__ == "__main__":
-#     # get_z3_result(create_random_query(5, 2, 3))
-#     seed(0)
-#
-#     for _ in tqdm(range(100)):
-#         num_var = randint(1, 10) * 2
-#         num_clause = randint(1, 10) * 10
-#         var_per_clause = randint(2, min(num_var, 10))
-#         clauses = create_random_query(num_var, num_clause, var_per_clause)
-#         perform_test(clauses, False)
-#
-#     clauses = create_random_query(100, 1000, 2)
-#     perform_test(clauses, False)
-#
-#     clauses = create_random_query(200, 1000, 4)
-#     perform_test(clauses, False)
-#
-#     # TODO: Does not work :(
-#     exit(-1)
-#     clauses = create_random_query(100, 400, 3)
-#     perform_test(clauses, False)

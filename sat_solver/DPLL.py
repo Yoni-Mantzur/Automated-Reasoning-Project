@@ -8,7 +8,6 @@ from sat_solver.cnf_formula import CnfFormula
 from sat_solver.sat_formula import Literal, Variable
 
 
-# TODO: Do we need to implement also pure literal?
 class DPLL(object):
     def __init__(self, cnf_formula: CnfFormula, partial_assignment=None, watch_literals=None, implication_graph=None,
                  is_first_run=True,
@@ -100,7 +99,6 @@ class DPLL(object):
         if reason is None:
             self.implication_graph.add_decide_node(level, literal)
         else:
-            # TODO: Should I add assignment from propgation of theroy solver?
             self.implication_graph.add_node(level, literal, self.formula.clauses[reason], reason)
 
         if not self.remove_clauses_by_assignment(literal):
@@ -223,15 +221,10 @@ class DPLL(object):
 
     def search(self) -> bool:
         '''
-
         :return: True if Sat else False
         '''
 
         self.rec_num += 1
-        # if self.rec_num > 70:
-        #     print("DEBUG")
-        # if self.rec_num > 30 and self.rec_num % 10 == 0:
-        #     print("depth: {}".format(self.rec_num))
         if self.formula is None:
             # Formula is unsat
             return False
@@ -244,8 +237,6 @@ class DPLL(object):
             self.unsat = False
             return True
 
-        # current_variables = self.formula.get_variables()
-        # TODO: does this heuristic make sense? we try the literal which appears the most, but if it is UNSAT we negate
         # it and try again, the second literal might not be very helpful
         self.check_theory_conflict()
         if self.propagate_helper:
@@ -253,7 +244,6 @@ class DPLL(object):
             # smt_res will be None if partial_assignment is empty
             if smt_res:
                 self._assignment[-1].update(smt_res)
-                # print(self._assignment[-1])
                 for variable, val in smt_res.items():
                     if val:
                         lit = Literal(variable, False)
@@ -263,12 +253,6 @@ class DPLL(object):
                     if not self.remove_clauses_by_assignment(lit):
                         self.formula.clauses = [[]]
                         return self.formula
-                # if not self.remove_clauses_by_assignment(lit):
-                #     self.formula.clauses = [[]]
-                #     return self.formula
-
-                # print(self._assignment[-1])
-                # print("*"*100)
 
                 if not smt_res:
                     # Conflict

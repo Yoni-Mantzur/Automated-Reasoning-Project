@@ -85,4 +85,4 @@ class CongruenceClosureAlgorithm(object):
 
     def args_function_in_same_class(self, t1: FunctionTerm, t2: FunctionTerm):
         return t1.name == t2.name and \
-            all((self.is_in_same_class(arg1, arg2) for arg1, arg2 in zip(t1.input_terms, t2.input_terms)))
+               all((self.is_in_same_class(arg1, arg2) for arg1, arg2 in zip(t1.input_terms, t2.input_terms)))

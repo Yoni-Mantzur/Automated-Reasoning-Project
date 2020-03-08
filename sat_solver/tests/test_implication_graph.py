@@ -8,6 +8,7 @@ from sat_solver.cnf_formula import CnfFormula
 from sat_solver.preprocessor import preprocess
 from sat_solver.sat_formula import Literal, Variable
 
+
 def get_complicated_graph() -> (ImplicationGraph, int, List[Variable]):
     variables = [Variable('TEMP')] + [Variable('x{}'.format(i + 1)) for i in range(10)]
     pos_l = [Literal(v, negated=False) for v in variables]
@@ -134,7 +135,6 @@ def test_boolean_resolution():
 
 
 def test_learn_conflict_simple():
-
     g, conflict_idx, variables = get_simple_graph()
 
     conflict_clause = g.learn_conflict(Literal(variables[3], False), conflict_idx)
@@ -174,6 +174,7 @@ def test_backjump_complicated():
     level = g.get_backjump_level(conflict_clause)
     expected_level = 1
     assert level == expected_level
+
 
 @pytest.fixture(autouse=True)
 def clean_counters():

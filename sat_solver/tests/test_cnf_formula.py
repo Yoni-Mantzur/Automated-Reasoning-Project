@@ -1,9 +1,11 @@
 from itertools import count
+
 import pytest
 
+from common.operator import Operator
 from sat_solver.cnf_formula import tseitins_transformation
 from sat_solver.sat_formula import SatFormula, Variable
-from common.operator import Operator
+
 
 def test_simple_tseitins_transformation():
     # Formula: (x1 & x2) || x3
@@ -13,7 +15,7 @@ def test_simple_tseitins_transformation():
     x1 = SatFormula.create_leaf("x1")
     x2 = SatFormula.create_leaf("x2")
     x3 = SatFormula.create_leaf("x3")
-    x1andx2 = SatFormula(x1, x2,Operator.AND)
+    x1andx2 = SatFormula(x1, x2, Operator.AND)
     f = SatFormula(x1andx2, x3, Operator.OR)
 
     actual_cnf = tseitins_transformation(f)
@@ -21,8 +23,6 @@ def test_simple_tseitins_transformation():
     expected_result = [['tse3'], ['~tse3', 'tse2', 'x3'], ['tse3', '~tse2'], ['tse3', '~x3'], ['tse2', '~x1', '~x2'],
                        ['~tse2', 'x1'], ['~tse2', 'x2']]
 
-    # print(actual_cnf)
-    # print(expected_result)
     assert len(expected_result) == len(actual_cnf)
     assert all([set(expected) in actual_cnf_set for expected in expected_result])
 
@@ -37,8 +37,6 @@ def test_simple_negate_tseitins_transformation():
 
     actual_cnf_set = [set(map(str, ls)) for ls in actual_cnf]
 
-    # print(actual_cnf)
-    # print(expected_result)
     assert len(expected_result) == len(actual_cnf)
     assert all([set(expected) in actual_cnf_set for expected in expected_result])
 
@@ -54,8 +52,6 @@ def test_complex_negate_tseitins_transformation():
 
     actual_cnf_set = [set(map(str, ls)) for ls in actual_cnf]
 
-    # print(actual_cnf)
-    # print(expected_result)
     assert len(expected_result) == len(actual_cnf)
     assert all([set(expected) in actual_cnf_set for expected in expected_result])
 
@@ -69,15 +65,6 @@ def test_complex_tseitins_transformation():
     f = SatFormula.from_str('~(~(p1&q1)->~r1)')
 
     actual_cnf = tseitins_transformation(f)
-    # expected_result = [['tse6'], ['~tse6', '~tse5'], ['tse6', 'tse5'], ['~tse5', '~tse4', '~r1'], #['~tse0', '~r1'], ['r1', 'tse0'],
-    #                    ['tse4', 'tse5'],
-    #                    ['tse5', 'r1'], ['~tse4', 'tse3'], ['tse4', 'tse3'], ['~tse3', 'p1'], ['~tse3', 'q1'],
-    #                    ['~p1', '~q1', 'tse3']]
-
-    # expected_result = [['tse8'], ['~tse8', '~tse7'], ['tse8', 'tse7'], ['~tse7', '~tse6', 'tse2'],
-    #                    ['~tse2', '~r1'], ['r1', 'tse2'], ['tse6', 'tse7'], ['tse7', '~tse2'],
-    #                    ['~tse6', '~tse5'], ['tse6', 'tse5'], ['~tse5', 'p1'], ['~tse5', 'q1'],
-    #                    ['~p1', '~q1', 'tse5']]
 
     expected_result = [['tse6'], ['~tse6', '~tse5'], ['tse6', 'tse5'], ['~tse5', '~tse4', 'tse0'],
                        ['~tse0', '~r1'], ['r1', 'tse0'], ['tse4', 'tse5'], ['tse5', '~tse0'],
@@ -85,11 +72,8 @@ def test_complex_tseitins_transformation():
                        ['~p1', '~q1', 'tse3']]
 
     actual_cnf_set = [set(map(str, ls)) for ls in actual_cnf]
-    
-    # print(actual_cnf)
-    # print(expected_result)
+
     assert len(expected_result) == len(actual_cnf)
-    # assert actual_expected_set == actual_cnf_set
     assert all([set(expected) in actual_cnf_set for expected in expected_result])
 
 

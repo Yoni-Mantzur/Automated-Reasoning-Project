@@ -31,6 +31,7 @@ class Node(object):
     def __repr__(self):
         return str(self)
 
+
 class Edge(object):
     def __init__(self, source: Node, target: Node, reason: int):
         '''
@@ -49,6 +50,7 @@ class Edge(object):
 
     def __repr__(self):
         return str(self)
+
 
 class ImplicationGraph(object):
     def __init__(self, cnf_formula: CnfFormula):
@@ -181,13 +183,8 @@ class ImplicationGraph(object):
             shared_var = node.literal.variable
             clause_on_edge = self._formula.clauses[self._incoming_edges[node][-1].reason]  # c' in the slides
             clause = self.boolean_resolution(clause, clause_on_edge, shared_var)
-            # TODO: The presentation (lec 3 slide 29) says to pick the next node as one of the incoming to the new_clause
-            # but that might create a loop (as in test_learn_conflict_simple case 2)
-            # node = self._nodes[self.find_last_assigned_literal(clause_on_edge).variable]
-
             node = self._nodes[self.find_last_assigned_literal(clause).variable]
         return clause
-
 
     def find_first_uip(self, formula_idx: int) -> Node:
         if self._last_decide_node is None or formula_idx >= len(self._formula.clauses):
@@ -239,6 +236,4 @@ class ImplicationGraph(object):
             node = self._nodes[n] if n in self._nodes else None
             if node in self._edges:
                 s += "{}: {}\n".format(n, self._edges[node])
-
-
         return s

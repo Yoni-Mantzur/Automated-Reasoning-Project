@@ -1,6 +1,6 @@
 from typing import List, Union, Optional, Dict
 
-from lp_solver.UnboundedException import InfeasibleException
+from lp_solver.unbounded_exception import InfeasibleException
 from lp_solver.lp_program import Equation, LpProgram
 from sat_solver.DPLL import DPLL
 from sat_solver.cnf_formula import CnfFormula

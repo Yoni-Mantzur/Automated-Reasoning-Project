@@ -1,5 +1,5 @@
-import pytest
 import numpy as np
+import pytest
 
 from lp_solver.eta_matrix import EtaMatrix
 

@@ -4,7 +4,6 @@ from typing import List, Dict, Optional, Tuple, Set
 
 from common.operator import Operator
 from sat_solver.DPLL import DPLL
-from sat_solver.cnf_formula import CnfFormula
 from sat_solver.sat_formula import SatFormula, Variable, Literal
 from smt_solver.patterns import *
 
@@ -207,7 +206,6 @@ class Formula(object):
     def __str__(self):
         formula = str(self.sat_formula)
         for literal, equation_idx in self.var_equation_mapping.items():
-
             equation = self.equations[equation_idx]
             formula = formula.replace(str(literal), '{}={}'.format(str(equation.lhs), str(equation.rhs)))
         return formula
@@ -341,10 +339,10 @@ class Formula(object):
                 assign_true = classes_algorithm.is_equation_is_true(equation_idx)
                 equation = self.equations[equation_idx]
 
-                # TODO: YONI - What is this? If I comment out the assert tests pass... for debug
+                # for debug
                 negated_literal = equation.fake_literals[NEGATED]
                 positive_literal = equation.fake_literals[not NEGATED]
-                # assert not (assign_true and negated_literal and positive_literal)
+                assert not (assign_true and negated_literal and positive_literal)
 
                 if assign_true:
                     assignments[var] = assign_true
@@ -376,4 +374,3 @@ class Formula(object):
         partial_assignment = dpll_algorithm.get_partial_assignment()
         assignment = self.transfer_assignment(partial_assignment)
         return self.satisfied(partial_assignment), assignment
-

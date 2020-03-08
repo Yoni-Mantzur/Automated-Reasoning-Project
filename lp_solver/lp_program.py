@@ -6,15 +6,11 @@ from typing import Dict, Optional
 from scipy import sparse
 from scipy.linalg import lu
 
-from lp_solver.UnboundedException import InfeasibleException
 from lp_solver.revised_simplex import *
 
 DANTZIG_TH = 100
-
-EPSILON = 10 ** -4
-
-# from lp_solver import UnboundedException
 FACTORIZATION_TH = 20
+NUMERIC_STABILITY_TH = 30
 
 
 class Equation(object):
@@ -159,7 +155,7 @@ class LpProgram(object):
 
             aux_obj = lp_aux.solve()
 
-            if  aux_obj == np.inf:
+            if aux_obj == np.inf:
                 assert 0 not in lp_aux.Xb
 
             if aux_obj != 0 and aux_obj != np.inf:
@@ -278,7 +274,6 @@ class LpProgram(object):
 
         self.An[:, entering_idx] = self.B[:, leaving_idx]
         self.etas.append(d_eta)
-        from scipy.linalg import lu
 
         self.B = np.dot(self.B, self.etas[-1].get_matrix())
 
@@ -297,6 +292,7 @@ class LpProgram(object):
         leaving_idx, t, d_eta = get_leaving_variable_idx(self, entering_idx)
 
         self.is_aux = False
+        # Diagnoal elements numerical stability
         d_eta_stable = np.bitwise_and(np.abs(d_eta.column) <= EPSILON, d_eta.column != 0)
         while entering_idx >= 0 and any(d_eta_stable):
             entering_idx = get_entering_variable_idx(self, bad_vars)
@@ -331,7 +327,7 @@ class LpProgram(object):
                 if iteration % 100 == 0:
                     print(float(np.dot(self.Cb, self.b)))
 
-                if self.safeguard() or len(self.etas) % FACTORIZATION_TH == 0:
+                if self.safeguard(iteration) or len(self.etas) % FACTORIZATION_TH == 0:
                     self.refactorize()
             return float(np.dot(self.Cb, self.b))
         except UnboundedException:
@@ -346,9 +342,11 @@ class LpProgram(object):
         # assignment.update(assignment_zero)
         return assignment
 
-    def safeguard(self):
-        # TODO: Is np.dot(B,b) is to expensive and we should build from the eta matrices?
-        return not np.allclose(np.dot(self.B, self.b), self.initial_b, atol=EPSILON)
+    def safeguard(self, iteration) -> bool:
+        if iteration % NUMERIC_STABILITY_TH != 0:
+            return False
+        b_approx = FTRAN_using_eta(self, self.initial_b)
+        return not np.allclose(self.b, b_approx, atol=EPSILON)
 
     def refactorize(self, B=None):
         print('Doing refactorize')

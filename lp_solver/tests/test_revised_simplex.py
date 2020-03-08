@@ -2,7 +2,8 @@ from typing import NamedTuple
 
 import numpy as np
 import pytest
-from lp_solver.UnboundedException import UnboundedException, InfeasibleException
+
+from lp_solver.unbounded_exception import UnboundedException, InfeasibleException
 from lp_solver.eta_matrix import EtaMatrix
 from lp_solver.lp_program import LpProgram, calculate_entering_bounds
 from lp_solver.revised_simplex import backward_transformation, forward_transformation, blands_rule, dantzig_rule, \
@@ -49,14 +50,10 @@ def test_dantzig_rule(coefs, variables, expected_chosen_var):
 @pytest.mark.parametrize(['rule'], [['dantzig'], ['bland']])
 def test_get_entering_variable_idx(rule):
     lp_program = LpProgram(rule=rule)
-
-    # lp_program.etas = [EtaMatrix([3, 1, 0], 0), EtaMatrix([1, 1, 0], 1), EtaMatrix([4, 3, 1], 2)]
-
     lp_program.B = np.array([[3, 1, 0], [1, 1, 0], [4, 3, 1]])
 
     # In the entering_variable we iterate over the etas, for this test performance is neglected (i.e. using EtaMatrix)
     lp_program.l_etas = [lp_program.B]
-    # lp_program.l_etas = lu(lp_program.B)
 
     lp_program.An = np.array([[2, 2, 1, 0], [1, 1, 0, 1], [3, 4, 0, 0]])
     lp_program.Xb = np.array([1, 3, 7])
@@ -68,14 +65,11 @@ def test_get_entering_variable_idx(rule):
     expected_var = 1
 
     assert expected_var == get_entering_variable_idx(lp_program, set())
-    # assert expected_var == get_entering_variable_idx(lp_program, rule=blands_rule, set())
 
 
 @pytest.mark.parametrize(['rule'], [['dantzig'], ['bland']])
 def test_get_entering_variable_idx_refactorize(rule):
     lp_program = LpProgram(rule=rule)
-
-    # lp_program.etas = [EtaMatrix([3, 1, 0], 0), EtaMatrix([1, 1, 0], 1), EtaMatrix([4, 3, 1], 2)]
 
     lp_program.B = np.array([[3, 1, 0], [1, 1, 0], [4, 3, 1]])
 
@@ -92,14 +86,11 @@ def test_get_entering_variable_idx_refactorize(rule):
     expected_var = 1
 
     assert expected_var == get_entering_variable_idx(lp_program, set())
-    # assert expected_var == get_entering_variable_idx(lp_program, rule=blands_rule, set())
 
 
 @pytest.mark.parametrize(['rule'], [['dantzig'], ['bland']])
 def test_get_leaving_variable_idx(rule):
     lp_program = LpProgram(rule=rule)
-
-    # lp_program.etas = [EtaMatrix([3, 1, 0], 0), EtaMatrix([1, 1, 0], 1), EtaMatrix([4, 3, 1], 2)]
 
     lp_program.B = np.array([[3, 1, 0], [1, 1, 0], [4, 3, 1]])
 

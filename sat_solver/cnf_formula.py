@@ -2,7 +2,6 @@ from copy import copy
 from typing import List, Dict, Optional, Set
 
 from common.operator import Operator
-
 from sat_solver.sat_formula import SatFormula, Literal, Variable
 
 
@@ -49,6 +48,8 @@ def tseitins_transformation(formula: SatFormula):
     # for testing propose
     if not formula:
         return None
+    if formula.is_leaf:
+        return [[formula.value]]
 
     new_variables = {}
 
@@ -81,7 +82,15 @@ def tseitins_transformation(formula: SatFormula):
         return convert_iff_cnf(new_variables[subformula.idx], rhs1=l_var, rhs2=r_var, operation=subformula.operator) + \
                recursion_tseitins_transformation(subformula.right) + recursion_tseitins_transformation(subformula.left)
 
-    return recursion_tseitins_transformation(formula) + [[new_variables[formula.idx]]]
+
+    new_formula = recursion_tseitins_transformation(formula)
+
+    if new_variables:
+        new_variables = [new_variables[formula.idx]]
+    else:
+        new_variables = []
+
+    return new_formula + new_variables
 
 
 class CnfFormula(object):
@@ -90,7 +99,6 @@ class CnfFormula(object):
         self.clauses = clauses
         self.empty_clauses = 0
         self.literal_to_clauses = literal_to_clauses
-
 
     @staticmethod
     def from_str(formula: str):
@@ -142,11 +150,10 @@ class CnfFormula(object):
         return True
 
     def get_literal_appears_max(self, assignments: Dict[Variable, bool]) -> Literal:
-        literals_length = {k: len(v) for k,v in self.literal_to_clauses.items()}
+        literals_length = {k: len(v) for k, v in self.literal_to_clauses.items()}
         literals_length_sorted = sorted(literals_length, key=literals_length.get, reverse=1)
         for l in literals_length_sorted:
             if literals_length[l] == 0:
                 return None
             if l.variable not in assignments:
                 return l
-

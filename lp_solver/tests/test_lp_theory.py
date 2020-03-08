@@ -1,6 +1,6 @@
 import numpy as np
 
-from lp_solver.LpTheory import LpTheory
+from lp_solver.lp_theory import LpTheory
 
 
 def test_auxiliry_lp():
@@ -31,7 +31,6 @@ def test_simple_lp_unfesiable():
     objective = '5x1,4x2'
 
     constraints = ['x1<=1', 'x2<=1', '-1x1,-1x2<=-3']
-    # constraints = ['-1x1,-1x2<=-3']
     lp = LpTheory(constraints, objective, rule=rule)
     feasible, obj = lp.solve()
     assert not feasible

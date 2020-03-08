@@ -11,6 +11,7 @@ def reset_counter():
     from sat_solver.sat_formula import Variable
     Variable._ids = count(0)
 
+
 def test_term_str(debug=True):
     if debug:
         print('Testing representation of the term f(s(a),x)')
@@ -29,7 +30,8 @@ def test_term_from_str(debug=True):
 
 
 def test_formula_from_str(debug=True):
-    for s in ['(q(x)=x->q(y)=y)', '(q(x)=x<->q(y)=y)', '~q(x)=x', '((x=y|x=z)&(~x=y|z=r))', '~r(r(x))=x', '(a=a|a=a)', '(r(x)=x|q(y)=y)', '(a=a&x=x)',
+    for s in ['(q(x)=x->q(y)=y)', '(q(x)=x<->q(y)=y)', '~q(x)=x', '((x=y|x=z)&(~x=y|z=r))', '~r(r(x))=x', '(a=a|a=a)',
+              '(r(x)=x|q(y)=y)', '(a=a&x=x)',
               '((r(x)=x&x=a)|q(x)=a)', 'r(r(x),y)=x', 'plus(s(x),y,s(plus(x,y)))=x', 'r(x8,x7,c)=a', 'r(x,y)=x']:
         if debug:
             print('Parsing', s, 'as a first-order formula...')
@@ -75,7 +77,8 @@ def test_get_parents(debug=True):
 
 
 def test_satisfied(debug=True):
-    for s, is_sat in [('(f(a,b)=a&~f(f(a,b),b)=a)', False),
+    for s, is_sat in [("(~f(x1)=a&f(x1)=a)", False),
+                    ('(f(a,b)=a&~f(f(a,b),b)=a)', False),
                       ('(f(x)=f(y)&~x=y)', True),
                       ('((f(f(f(a)))=a&f(f(f(f(f(a)))))=a)&f(a)=a)', True)]:
         if debug:
@@ -121,7 +124,6 @@ def test_propagation(debug=True):
 
 
 def test_conflict(debug=True):
-
     for s, assignment, conflict in [['(x=y&~f(x)=f(y))', {0: True, 1: False}, {0: False, 1: True}],
                                     ['((x=y&~f(x)=f(y))&f(x)=f(y))', {2: True, 3: False}, {2: False, 3: True}],
                                     ['((x=y&~f(x)=f(y))&z=c)', {5: True, 6: True}, []]]:
@@ -138,6 +140,7 @@ def test_conflict(debug=True):
         conflict = formula.conflict(partial_assignment)
 
         assert expected_conflict == conflict
+
 
 if __name__ == '__main__':
     test_conflict()

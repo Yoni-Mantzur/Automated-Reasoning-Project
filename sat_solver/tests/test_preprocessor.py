@@ -1,8 +1,8 @@
 import pytest
 
 from sat_solver.cnf_formula import CnfFormula
-from sat_solver.sat_formula import Literal, Variable
 from sat_solver.preprocessor import remove_redundant_literals, delete_trivial_clauses
+from sat_solver.sat_formula import Literal, Variable
 
 v1 = Variable(name='v1')
 v2 = Variable(name='v2')

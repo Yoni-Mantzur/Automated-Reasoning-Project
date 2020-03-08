@@ -6,4 +6,5 @@ term_pattern = '((?P<function>{function_pattern})|(?P<variable>{variable_pattern
 equation_pattern = '(?P<lhs>{term_pattern})=(?P<rhs>{term_pattern})'
 
 unary_formula_pattern = '(?P<op>{unary})(?P<left>.+)'.format(unary=unary_operator_pattern)
-binary_formula_pattern = '\\((?P<left>[.*=.*]+)(?P<op>{binary})(?P<right>[.*=.*]+)$\\)'.format(binary=binary_operator_pattern)
+binary_formula_pattern = '\\((?P<left>[.*=.*]+)(?P<op>{binary})(?P<right>[.*=.*]+)$\\)'.format(
+    binary=binary_operator_pattern)

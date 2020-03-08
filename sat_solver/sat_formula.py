@@ -1,11 +1,10 @@
 import re
-
 from itertools import count
-from typing import Optional, List
-
-from sat_solver.patterns import variable_pattern, unary_formula_pattern, binary_formula_pattern
+from typing import List
 
 from common.operator import Operator
+from sat_solver.patterns import variable_pattern, unary_formula_pattern, binary_formula_pattern
+
 
 class Literal(object):
     def __init__(self, variable, negated):
@@ -42,7 +41,6 @@ class Literal(object):
 
 
 class Variable(object):
-
     _ids = count(-1)
 
     def __init__(self, name: str):
@@ -61,14 +59,15 @@ class Variable(object):
     def __hash__(self):
         return hash(self.name) + hash(self.idx)
 
+
 class SatFormula(object):
     _ids = count(-1)
 
     def __init__(self,
-                 left: 'SatFormula'=None,
-                 right: 'SatFormula'=None,
-                 operator: Operator=None,
-                 is_leaf: bool=False):
+                 left: 'SatFormula' = None,
+                 right: 'SatFormula' = None,
+                 operator: Operator = None,
+                 is_leaf: bool = False):
         self.operator = operator
         self.left = left
         self.right = right
@@ -139,3 +138,29 @@ class SatFormula(object):
 
         return SatFormula(left, right, op)
 
+    def from_infix(self, s):
+        def get_op(s):
+            pass
+
+
+        def _from_infix_helper(idx):
+            if s[idx] == Operator.NEGATION.value:
+                first, new_idx = _from_infix_helper(idx + 1)
+                return SatFormula(first, operator=Operator.NEGATION), new_idx
+
+            if s[idx] == '(':
+                first, new_idx = _from_infix_helper(idx + 1)
+                root, gap_idx = get_op(s[new_idx:])
+
+                second, new_idx = _from_infix_helper(new_idx + gap_idx)
+                return SatFormula(first, second, Operator(root)), new_idx + 1  # The new_idx + 1 is for the ')'
+
+            return SatFormula.create_leaf(s[idx]), idx + 1
+
+            var_idx = Formula.get_variable_index(s, idx)
+            if var_idx > 0:
+                return Formula(s[idx:var_idx]), var_idx
+
+            return None
+
+        return _from_infix_helper(0)[0]

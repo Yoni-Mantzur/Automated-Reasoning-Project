@@ -3,7 +3,7 @@ from typing import Union, List, Callable, Tuple, Set
 
 import numpy as np
 
-from lp_solver.UnboundedException import UnboundedException, InfeasibleException
+from lp_solver.unbounded_exception import UnboundedException, InfeasibleException
 from lp_solver.eta_matrix import EtaMatrix
 
 EPSILON = 10 ** -4
@@ -17,17 +17,11 @@ def extract_legal_coefficients(rule: Callable[[Union[np.ndarray, List[float]], U
         if len(coefficients) != len(variables):
             raise Exception('Non matching vars/coef size')
 
-        # Zero tolerance
-        if np.max(coefficients) <= EPSILON and set(variables) == bad_vars:
-            # TODO: Remove
-            print("OOPS")
+        if set(variables) == bad_vars:
             return -1
 
-        # Remove bad variables: i.e. given or with negative coefficient
-        # TODO: Sorry Yoni the zip(*filter()) does not work
-        # filtered_coeffs, filtered_vars = zip(
-        #     *(filter(lambda unit: unit[0] > 0 and unit[1] not in bad_vars, zip(coefficients, variables))))
-        op = lambda x: x > 0
+        # Remove bad variables: i.e. with negative coefficient (apply zero tolerance)
+        op = lambda x: x > EPSILON
         filtered_coeffs, filtered_vars = [], []
         for c, v in zip(coefficients, variables):
             if op(c) and v not in bad_vars:
@@ -101,8 +95,8 @@ def get_entering_variable_idx(lp_program, bad_vars: Set[int]) -> int:
 
     y = lp_program.permute_matrix(y, lp_program.p_inv)
 
-    y_tag = backward_transformation(lp_program.B, lp_program.Cb)
-    np.testing.assert_almost_equal(y_tag, y)
+    # y_tag = backward_transformation(lp_program.B, lp_program.Cb)
+    # np.testing.assert_almost_equal(y_tag, y,decimal=4)
 
     coefs = lp_program.Cn - np.dot(y, lp_program.An)
     variables = lp_program.Xn
@@ -117,9 +111,8 @@ def is_unbounded(leaving_var_coefficient: np.ndarray, is_max: bool) -> bool:
         return all(leaving_var_coefficient > 0)
 
 
-def calculate_entering_coefficient(lp_program, entering_idx):
-    a = lp_program.An[:, entering_idx]
-    d = np.copy(a)
+def FTRAN_using_eta(lp_program, vector):
+    d = np.copy(vector)
 
     d = lp_program.permute_matrix(d, lp_program.p)
     for eta in lp_program.l_etas:
@@ -130,7 +123,7 @@ def calculate_entering_coefficient(lp_program, entering_idx):
     for eta in lp_program.etas:
         d = forward_transformation(eta, d)
 
-    np.testing.assert_almost_equal(d, forward_transformation(lp_program.B, a))
+    # np.testing.assert_almost_equal(d, forward_transformation(lp_program.B, vector))
     return d
 
 
@@ -176,7 +169,7 @@ def calculate_entering_bounds(lp, d) -> Tuple[float, int]:
 
 
 def get_leaving_variable_idx(lp_program, entering_idx: int) -> Tuple[int, float, EtaMatrix]:
-    d = calculate_entering_coefficient(lp_program, entering_idx)
+    d = FTRAN_using_eta(lp_program, lp_program.An[:, entering_idx])
 
     # if is_unbounded(d, is_max=not lp_program.is_aux):
     #     raise UnboundedException()
