@@ -86,7 +86,7 @@ def tseitins_transformation(formula: SatFormula):
     new_formula = recursion_tseitins_transformation(formula)
 
     if new_variables:
-        new_variables = [new_variables[formula.idx]]
+        new_variables = [[new_variables[formula.idx]]]
     else:
         new_variables = []
 

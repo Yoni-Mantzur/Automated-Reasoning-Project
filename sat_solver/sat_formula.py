@@ -110,34 +110,6 @@ class SatFormula(object):
         formula.__setattr__('value', variable)
         return formula
 
-    # @classmethod
-    # def from_str(cls, formula: str) -> 'SatFormula':
-    #     m_variable = re.match(variable_pattern, formula)
-    #     m_unary = re.match(unary_formula_pattern, formula)
-    #     m_binary = re.match(binary_formula_pattern, formula)
-    #
-    #     if m_variable:
-    #         variable_name = m_variable.group()
-    #         return SatFormula.create_leaf(variable_name)
-    #
-    #     # Unary case
-    #     if m_unary:
-    #         m = m_unary
-    #         right = None
-    #
-    #     # Binary case
-    #     elif m_binary:
-    #         m = m_binary
-    #         right = SatFormula.from_str(m_binary.group('right'))
-    #
-    #     else:
-    #         raise Exception
-    #
-    #     left = SatFormula.from_str(m.group('left'))
-    #     op = Operator(m.group('op'))
-    #
-    #     return SatFormula(left, right, op)
-
     @staticmethod
     def from_str(s):
         def get_op(s):
@@ -176,7 +148,9 @@ class SatFormula(object):
             return variables[v], var_idx
 
         constants = {'T': SatFormula.create_leaf('T'),
-                     'F': SatFormula.create_leaf('F', negated=True)}
+                     'F': SatFormula.create_leaf('F'),
+                     '~F': 'T',
+                     '~T': 'F'}
 
         variables = {}
 

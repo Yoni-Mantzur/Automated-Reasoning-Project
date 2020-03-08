@@ -33,7 +33,7 @@ def test_simple_negate_tseitins_transformation():
 
     f = SatFormula.from_str('~r1')
     actual_cnf = tseitins_transformation(f)
-    expected_result = [['tse0'], ['~tse0', '~r1'], ['r1', 'tse0']]
+    expected_result = [['tse2'], ['~tse2', '~r1'], ['r1', 'tse2']]
 
     actual_cnf_set = [set(map(str, ls)) for ls in actual_cnf]
 
@@ -47,8 +47,8 @@ def test_complex_negate_tseitins_transformation():
 
     f = SatFormula.from_str('~(r1|r2)')
     actual_cnf = tseitins_transformation(f)
-    expected_result = [['tse2'], ['~tse1', 'r1', 'r2'], ['~r1', 'tse1'], ['~r2', 'tse1'], ['~tse2', '~tse1'],
-                       ['tse2', 'tse1']]
+    expected_result = [['tse4'], ['~tse3', 'r1', 'r2'], ['~r1', 'tse3'], ['~r2', 'tse3'], ['~tse3', '~tse4'],
+                       ['tse3', 'tse4']]
 
     actual_cnf_set = [set(map(str, ls)) for ls in actual_cnf]
 
@@ -66,8 +66,8 @@ def test_complex_tseitins_transformation():
 
     actual_cnf = tseitins_transformation(f)
 
-    expected_result = [['tse6'], ['~tse6', '~tse5'], ['tse6', 'tse5'], ['~tse5', '~tse4', 'tse0'],
-                       ['~tse0', '~r1'], ['r1', 'tse0'], ['tse4', 'tse5'], ['tse5', '~tse0'],
+    expected_result = [['tse8'], ['~tse8', '~tse7'], ['tse8', 'tse7'], ['~tse7', '~tse4', 'tse6'],
+                       ['~tse6', '~r1'], ['r1', 'tse6'], ['tse4', 'tse7'], ['tse7', '~tse6'],
                        ['~tse4', '~tse3'], ['tse4', 'tse3'], ['~tse3', 'p1'], ['~tse3', 'q1'],
                        ['~p1', '~q1', 'tse3']]
 
