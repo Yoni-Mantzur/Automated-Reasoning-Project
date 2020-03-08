@@ -2,15 +2,19 @@ import enum
 import re
 from copy import copy
 from typing import Dict, Optional
-import numpy as np
+
+from scipy import sparse
+from scipy.linalg import lu
+
 from lp_solver.UnboundedException import InfeasibleException
 from lp_solver.revised_simplex import *
 
+DANTZIG_TH = 100
 
 EPSILON = 10 ** -4
 
 # from lp_solver import UnboundedException
-FACTORIZATION_TH = 2
+FACTORIZATION_TH = 20
 
 
 class Equation(object):
@@ -118,8 +122,7 @@ class LpProgram(object):
         self.is_aux = is_aux
         self.need_solve_auxiliry = False
         self.B = np.array([[]])  # type: np.ndarray
-        self.l_etas = []  # type: List[EtaMatrix]
-        self.u_etas = []  # type: List[EtaMatrix]
+
         self.Xb = np.array([])  # type: np.ndarray
 
         # Non-basic coefficients and variables
@@ -132,27 +135,34 @@ class LpProgram(object):
         if equations:
             self._add_equations(equations)
 
-
         # Objective coefficients for basic and non basic variables
         self.Cb = None
         self.Cn = None
         if objective:
             self._create_objective(objective)
 
-        self.p = np.arange(len(self.B))  # type: np.ndarray
-        from functools import partial
+        # Lists to help fast calculation for B^-1, etas are the changes in B, from time to time the list gets to long
+        # and then we do LU decomposition and store it in l,u,p lists (as eta matrices)
+        self.etas = []  # type: List[EtaMatrix]
+        self.l_etas = []  # type: List[EtaMatrix]
+        self.u_etas = []  # type: List[EtaMatrix]
+        self.p_inv = None
+        self.p = None
+
         rules = {'dantzig': dantzig_rule, 'bland': blands_rule}
 
         self.rule = rules.get(rule.lower(), rules['dantzig'])
         self.initial_b = np.copy(self.b)
 
         if self.need_solve_auxiliry:
-            lp_aux = LpProgram(equations, objective='-1x0', is_aux=True)
+            lp_aux = LpProgram(equations, objective='-1x0', is_aux=True, rule=rule)
 
             aux_obj = lp_aux.solve()
 
-            assert aux_obj != np.inf
-            if aux_obj != 0:
+            if  aux_obj == np.inf:
+                assert 0 not in lp_aux.Xb
+
+            if aux_obj != 0 and aux_obj != np.inf:
                 raise InfeasibleException
 
             self.initialize_from_auxiliry(lp_aux)
@@ -178,7 +188,7 @@ class LpProgram(object):
         # self.etas = lp_aux.etas
         self.b = lp_aux.b
 
-        for e,l in zip(entering_vars, leaving_vars):
+        for e, l in zip(entering_vars, leaving_vars):
             e_idx, l_idx = int(np.where(self.Xn == e)[0]), int(np.where(self.Xb == l)[0])
             d_eta = EtaMatrix(self.An[:, e_idx], l_idx)
 
@@ -206,7 +216,9 @@ class LpProgram(object):
         for i, equation in enumerate(equations):
             cur_equation = np.zeros(shape=(n,))
             for variable, coefficient in equation.units.items():
-                assert variable < cur_equation.shape[0], "var: {}, cur_equation.shape[0]: {}".format(variable, cur_equation.shape[0])
+                assert variable < cur_equation.shape[0], "var: {}, cur_equation.shape[0]: {}".format(variable,
+                                                                                                     cur_equation.shape[
+                                                                                                         0])
                 cur_equation[variable] = coefficient
 
             # Add row
@@ -231,6 +243,33 @@ class LpProgram(object):
                    self.Xn,
                    self.Cb.shape, self.Cb, self.Cn.shape, self.Cn, self.b.shape, self.b)
 
+    @classmethod
+    def permute_matrix(cls, vec: np.ndarray, permutation_order: np.ndarray) -> np.ndarray:
+        if permutation_order is None:
+            return vec
+
+        permute_vec = np.copy(vec)
+        for i, p in enumerate(permutation_order):
+            permute_vec[p] = vec[i]
+
+        return permute_vec
+
+    def recalculate_b(self):
+        b_tag = np.eye(self.B.shape[0])
+
+        if self.p is not None:
+            for i, p in enumerate(self.p):
+                b_tag[i, :] = np.eye(self.B.shape[0])[p, :]
+            for e in self.l_etas:
+                b_tag = np.dot(b_tag, e.get_matrix())
+            for e in self.u_etas[::-1]:
+                b_tag = np.dot(b_tag, e.get_matrix().T)
+
+        for e in self.etas:
+            b_tag = np.dot(b_tag, e.get_matrix())
+
+        return b_tag
+
     def swap_basis(self, entering_idx, leaving_idx, d_eta):
         self.Xb[leaving_idx], self.Xn[entering_idx] = self.Xn[entering_idx], self.Xb[leaving_idx]
         self.Cb[leaving_idx], self.Cn[entering_idx] = self.Cn[entering_idx], self.Cb[leaving_idx]
@@ -238,10 +277,12 @@ class LpProgram(object):
         t1, t2 = np.copy(self.An[:, entering_idx]), np.copy(self.B[:, leaving_idx])
 
         self.An[:, entering_idx] = self.B[:, leaving_idx]
-        self.l_etas.append(d_eta)
-        self.B = np.dot(self.B, self.l_etas[-1].get_matrix())
+        self.etas.append(d_eta)
+        from scipy.linalg import lu
 
-        # np.testing.assert_almost_equal(t1, self.B[:, leaving_idx])
+        self.B = np.dot(self.B, self.etas[-1].get_matrix())
+
+        np.testing.assert_array_almost_equal(self.B, self.recalculate_b())
 
     def get_good_entering_leaving_idx(self) -> [int, int, float, EtaMatrix]:
         '''
@@ -249,7 +290,7 @@ class LpProgram(object):
         '''
         bad_vars = set()
         if self.is_aux:
-            entering_idx = 0 #int(np.where(self.Xn == 0)[0])
+            entering_idx = 0  # int(np.where(self.Xn == 0)[0])
             assert self.Xn[entering_idx] == 0
         else:
             entering_idx = get_entering_variable_idx(self, bad_vars)
@@ -265,8 +306,6 @@ class LpProgram(object):
         return entering_idx, leaving_idx, t, d_eta
 
     def solve(self) -> Optional[float]:
-        # TODO: Implement refactorization
-        # TODO: Connect LP to the SMT solver  ???
         iteration = 0
         try:
             entering_idx = 0  # get_entering_variable_idx(self)
@@ -282,18 +321,17 @@ class LpProgram(object):
                 self.swap_basis(entering_idx, leaving_idx, d_eta)
                 # Update the assignments
                 self.b -= t * d_eta.column
-
                 self.b[leaving_idx] = t
 
                 # entering_idx = get_entering_variable_idx(self)
                 iteration += 1
+                if iteration > DANTZIG_TH and self.rule == dantzig_rule:
+                    self.rule = blands_rule
 
-                # TODO: Do we need to extract the actual assignment (for the real variables)?
-            # y = backward_transformation(self.B, self.Cb)
-            # coefs = self.Cn - np.dot(y, self.An)
-            # np.dot(self.b, coefs) +
+                if iteration % 100 == 0:
+                    print(float(np.dot(self.Cb, self.b)))
 
-                if self.safeguard() or iteration % FACTORIZATION_TH == 0:
+                if self.safeguard() or len(self.etas) % FACTORIZATION_TH == 0:
                     self.refactorize()
             return float(np.dot(self.Cb, self.b))
         except UnboundedException:
@@ -312,17 +350,16 @@ class LpProgram(object):
         # TODO: Is np.dot(B,b) is to expensive and we should build from the eta matrices?
         return not np.allclose(np.dot(self.B, self.b), self.initial_b, atol=EPSILON)
 
-    def refactorize(self, B = None):
-        from scipy.linalg import lu
-        from scipy import sparse
-
+    def refactorize(self, B=None):
+        print('Doing refactorize')
         # for testing
         B = B if B is not None else self.B
 
         p, l, u = lu(B)
+        p_inv = np.linalg.inv(p)
 
         basic_size = len(B)
-        self.B = np.eye(basic_size)
+        # self.B = np.eye(basic_size)
 
         Li, Ui = [], []
         eye = np.eye(basic_size)
@@ -332,19 +369,20 @@ class LpProgram(object):
 
             # L is lower triangular
             if not np.array_equal(id_column, l[:, i]):
-                Li += [EtaMatrix(l[:,i], i)]
+                Li += [EtaMatrix(l[:, i], i)]
 
             # U is upper triangular
-            if not np.array_equal(id_column, u.T[:,i]):
-                Ui += [EtaMatrix(u.T[:,i], i)]
+            if not np.array_equal(id_column, u.T[:, i]):
+                Ui += [EtaMatrix(u.T[:, i], i)]
 
         self.l_etas = Li
         self.u_etas = Ui
+        self.etas = []
 
         # p maps each row to the pivoted raw
         _, self.p, v = sparse.find(p)
         assert np.array_equal(v, np.ones(len(v)))
+        _, self.p_inv, v = sparse.find(p_inv)
+        assert np.array_equal(v, np.ones(len(v)))
 
-        return Li, Ui, self.p
-
-
+        return Li, Ui, self.p_inv

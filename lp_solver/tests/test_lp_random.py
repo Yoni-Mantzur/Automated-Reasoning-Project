@@ -28,7 +28,7 @@ class lp_variable():
 
 
 def solve_our(equations_str, objective_str) -> [float, Dict[int, float]]:
-    rule = 'bland'
+    rule = 'dantzig' #'bland'
     try:
         lp = LpProgram(equations_str, objective_str, rule=rule)
     except InfeasibleException:
@@ -46,8 +46,9 @@ lp_random_tests_aux = [
     # [50, 30],
 ]
 
+# lp_random_tests_aux = [[5,2]]
 
-@pytest.mark.timeout(15)
+@pytest.mark.timeout(55)
 @pytest.mark.parametrize(['num_variables', 'num_equations'], lp_random_tests_aux)
 def test_random_lp_auxiliary(num_variables, num_equations):
     return run_one_compare(num_variables, num_equations)
@@ -58,7 +59,7 @@ lp_random_tests = [[3, 2], [20, 2], [5, 4], [7, 4], [4, 2], [4, 4], [5, 3]]
                  #  ]
 
 
-@pytest.mark.timeout(15)
+@pytest.mark.timeout(55)
 @pytest.mark.parametrize(['num_variables', 'num_equations'], lp_random_tests)
 def test_random_lp(num_variables, num_equations):
     return run_one_compare(num_variables, num_equations, constraint_scalar_sample=partial(uniform, a=0, b=1))
@@ -66,6 +67,7 @@ def test_random_lp(num_variables, num_equations):
 
 def run_one_compare(num_variables, num_equations, constraint_coefficent_sample=constraint_coefficent_sample,
                     obj_coefficent_sample=obj_coefficent_sample, constraint_scalar_sample=constraint_scalar_sample):
+    seed(0)
     # pytest.skip("Need to detect loop assignments, why does it happen?")
     gmodel = Model("test")
     variables = [lp_variable(i, gmodel) for i in range(1, num_variables + 1)]
@@ -75,18 +77,18 @@ def run_one_compare(num_variables, num_equations, constraint_coefficent_sample=c
         cur_equation = []
         gurobi_eq = LinExpr()
         for v in variables:
-            c = constraint_coefficent_sample()
+            c = round(constraint_coefficent_sample(), 3)
             # cur_equation.append(lp_variable(j,c))
             cur_equation.append("{}{}".format(c, str(v)))
             gurobi_eq += c * v.get_gurobi_var()
-        b = constraint_scalar_sample()
+        b = round(constraint_scalar_sample(), 3)
         equations_str.append("{}<={}".format(','.join(cur_equation), b))
         gmodel.addConstr(gurobi_eq <= b, '{}'.format(i))
 
     objective_str = ''
     gurobi_obj = LinExpr()
     for v in variables:
-        c = obj_coefficent_sample()
+        c = round(obj_coefficent_sample(), 3)
         objective_str += "{}{},".format(c, v)
         gurobi_obj += c * v.get_gurobi_var()
 
@@ -95,15 +97,16 @@ def run_one_compare(num_variables, num_equations, constraint_coefficent_sample=c
     gmodel.setObjective(gurobi_obj, GRB.MAXIMIZE)
     gmodel.optimize()
 
-    print(equations_str, "\n", objective_str)
+    # print(equations_str, "\n", objective_str)
     our_objective, our_assignment = solve_our(equations_str, objective_str)
 
+    if gmodel.status == GRB.INF_OR_UNBD:
+        gmodel.setParam('DualReductions', 0)
+        gmodel.optimize()
+        print('UNBOUNDED' if gmodel.status == GRB.UNBOUNDED else 'INFEASIBLE')
     if our_objective == np.inf:
-        assert gmodel.status == GRB.UNBOUNDED or gmodel.status == GRB.INF_OR_UNBD
+        assert gmodel.status == GRB.UNBOUNDED
     elif our_objective is None:
-        if gmodel.status == GRB.INF_OR_UNBD:
-            gmodel.setParam('DualReductions', 0)
-            gmodel.optimize()
         assert gmodel.status == GRB.INFEASIBLE
     else:
         # IF the solution is not feasible the status would be GRB.INFEASIBLE
