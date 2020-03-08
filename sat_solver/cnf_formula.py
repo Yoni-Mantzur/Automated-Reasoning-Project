@@ -106,7 +106,7 @@ class CnfFormula(object):
         return CnfFormula(clauses)
 
     def get_variables(self):
-        # The formula holds literls, convert to variable and remove duplicates
+        # The formula holds literals, convert to variable and remove duplicates
         return list(set([v.variable for subformula in self.clauses for v in subformula]))
 
     def get_literals(self):
@@ -128,9 +128,6 @@ class CnfFormula(object):
             indices = [indices]
 
         for idx in sorted(indices, reverse=True):
-            # if idx >= len(self.clauses):
-            #     # print("DEBUG")
-            #     continue
             for lit in self.clauses[idx]:
                 # Update the literal_tp_clauses we use it in the decision heuristic
                 self.literal_to_clauses[lit].remove(idx)

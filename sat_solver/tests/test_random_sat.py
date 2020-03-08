@@ -62,7 +62,6 @@ def perform_test(clauses: List[List[Literal]], debug=False):
     dpll = DPLL(cnf)
     search_result = dpll.search()
     if debug:
-        # print(clauses)
         print(dpll.get_full_assignment())
     our_time_end = timer()
 

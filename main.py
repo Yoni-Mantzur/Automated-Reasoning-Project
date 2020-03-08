@@ -35,6 +35,7 @@ if __name__ == "__main__":
     if sys.argv[1].lower() == 'lp':
         if len(sys.argv) < 4:
             print("lp requires at least one equation and one objective")
+            exit(1)
         equations = sys.argv[2:-1]
         objective = sys.argv[-1]
         try:
@@ -44,9 +45,12 @@ if __name__ == "__main__":
             printable_z = z
         except UnboundedException:
             z = np.inf
-            printable_z = 'Unbounded'
         except InfeasibleException:
             z = None
-            printable_z = 'Infeasible'
 
-        print(f"Got {printable_z} for objective\n{objective}")
+        if z is None:
+            printable_z = 'Infeasible'
+        elif z == np.inf:
+            printable_z = 'Unbounded'
+
+        print(f"Got {printable_z} for objective\n\t{objective}")

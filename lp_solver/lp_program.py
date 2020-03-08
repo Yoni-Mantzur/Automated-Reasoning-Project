@@ -36,7 +36,6 @@ class Equation(object):
         return int(v), float(c)
 
     def parse_lhs(self, lhs: str):
-        # Parse left side
         units = lhs.split(',')
         for unit in units:
             v, c = Equation.unit_from_str(unit.strip())
@@ -113,8 +112,6 @@ class Equation(object):
 class LpProgram(object):
     def __init__(self, equations: List[Union[Equation, str]] = None, objective: Union[Equation, str] = None,
                  rule: str = 'Dantzig', is_aux=False):
-        # Basis, coefficients and variables
-        # self.B = [] # type: # List[EtaMatrix]
         self.is_aux = is_aux
         self.need_solve_auxiliry = False
         self.B = np.array([[]])  # type: np.ndarray
@@ -172,7 +169,8 @@ class LpProgram(object):
         self.Cn = np.zeros(shape=len(self.Xn))
 
         for v, c in objective.units.items():
-            assert v <= len(self.Cn), "There is an unbounded variable"
+            if v >= len(self.Cn):
+                raise UnboundedException
             self.Cn[v] = c
 
     def initialize_from_auxiliry(self, lp_aux: 'LpProgram'):
@@ -180,8 +178,6 @@ class LpProgram(object):
         # Pivot to the assignment basis
         entering_vars = set(assignment.keys()) - set(self.Xb)
         leaving_vars = set(self.Xb) - set(assignment.keys())
-        # self.B = lp_aux.B
-        # self.etas = lp_aux.etas
         self.b = lp_aux.b
 
         for e, l in zip(entering_vars, leaving_vars):
@@ -285,14 +281,14 @@ class LpProgram(object):
         '''
         bad_vars = set()
         if self.is_aux:
-            entering_idx = 0  # int(np.where(self.Xn == 0)[0])
+            entering_idx = 0
             assert self.Xn[entering_idx] == 0
         else:
             entering_idx = get_entering_variable_idx(self, bad_vars)
         leaving_idx, t, d_eta = get_leaving_variable_idx(self, entering_idx)
 
         self.is_aux = False
-        # Diagnoal elements numerical stability
+        # Diagonal elements numerical stability
         d_eta_stable = np.bitwise_and(np.abs(d_eta.column) <= EPSILON, d_eta.column != 0)
         while entering_idx >= 0 and any(d_eta_stable):
             entering_idx = get_entering_variable_idx(self, bad_vars)
@@ -306,7 +302,6 @@ class LpProgram(object):
         try:
             entering_idx = 0  # get_entering_variable_idx(self)
             while entering_idx >= 0:
-                # leaving_idx, t, d = get_leaving_variable_idx(self, entering_idx)
                 entering_idx, leaving_idx, t, d_eta = self.get_good_entering_leaving_idx()
 
                 if entering_idx < 0:
@@ -319,7 +314,6 @@ class LpProgram(object):
                 self.b -= t * d_eta.column
                 self.b[leaving_idx] = t
 
-                # entering_idx = get_entering_variable_idx(self)
                 iteration += 1
                 if iteration > DANTZIG_TH and self.rule == dantzig_rule:
                     self.rule = blands_rule
@@ -337,9 +331,7 @@ class LpProgram(object):
 
     def get_assignment(self):
         assignment = dict(zip(self.Xb, self.b))
-        # assignment_zero = dict(zip(self.Xn, [0] * len(self.Xn)))
-        #
-        # assignment.update(assignment_zero)
+
         return assignment
 
     def safeguard(self, iteration) -> bool:
@@ -349,15 +341,12 @@ class LpProgram(object):
         return not np.allclose(self.b, b_approx, atol=EPSILON)
 
     def refactorize(self, B=None):
-        print('Doing refactorize')
-        # for testing
         B = B if B is not None else self.B
 
         p, l, u = lu(B)
         p_inv = np.linalg.inv(p)
 
         basic_size = len(B)
-        # self.B = np.eye(basic_size)
 
         Li, Ui = [], []
         eye = np.eye(basic_size)

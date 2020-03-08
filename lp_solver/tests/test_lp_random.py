@@ -74,7 +74,6 @@ def run_one_compare(num_variables, num_equations, constraint_coefficent_sample=c
         gurobi_eq = LinExpr()
         for v in variables:
             c = round(constraint_coefficent_sample(), 3)
-            # cur_equation.append(lp_variable(j,c))
             cur_equation.append("{}{}".format(c, str(v)))
             gurobi_eq += c * v.get_gurobi_var()
         b = round(constraint_scalar_sample(), 3)

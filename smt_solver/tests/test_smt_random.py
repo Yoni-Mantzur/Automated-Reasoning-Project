@@ -20,7 +20,6 @@ class UF:
     def create_random_call(self, smt_vars: List['smt_var']) -> [str, ArithRef]:
         v = choices(smt_vars, k=self.input_range)
         v_str = "".join(str(v)).replace('[', '').replace(']', '')
-        # "f1(a1,a2,a3)"
         z3_func_call = self.z3(*[cur_v.z3 for cur_v in v])
         return "{}({})".format(self.name, v_str), z3_func_call
 
@@ -60,7 +59,6 @@ class smt_clause:
         lhs_str, lhs_z3 = self.create_smt_literal()
         rhs_str, rhs_z3 = self.create_smt_literal()
 
-        # f(a1,a2)=a3
         smt_clause_str = "{}={}".format(lhs_str, rhs_str)
         smt_clause_z3 = lhs_z3 == rhs_z3
         if not self.equality:
@@ -84,8 +82,6 @@ def create_random_query(num_functions=4, num_variables=5, num_clauses=4):
         str_clauses.append(str_c)
         z3_clauses.append(z3_c)
 
-    # a1=a2
-    # ~a1=a2
     str_clause = str_clauses[0]
     z3_clause = z3_clauses[0]
     for i in range(1, len(str_clauses)):
@@ -116,20 +112,14 @@ def perform_test(str_query, z3_query, debug=False):
     z3_time_end = timer()
 
     our_time_start = timer()
-    # print(str_query)
     f = Formula.from_str(str_query.replace(' ', ''))
-    # print(f.sat_formula)
     res, assignment = f.solve()
 
-    if debug:
-        pass
-        # print(assignment)
     our_time_end = timer()
 
     assert res == z3_res, "q: {}, Our: {}, Z3: {}".format(str_query, res, z3_res)
     res_str = 'Sat ' if res else 'UNSAT '
 
-    # res_str += "#var: {}, #clauses: {} #per_clause: {} ".format(len(all_vars), len(clauses), len(clauses[0]))
     res_str += "Time(sec): Our {:0.2f}, z3: {:0.2f}".format(our_time_end - our_time_start, z3_time_end - z3_time_start)
     print(res_str)
 

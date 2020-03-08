@@ -23,17 +23,8 @@ def get_complicated_graph() -> (ImplicationGraph, int, List[Variable]):
     c6 = [pos_l[7], pos_l[5]]
     c7 = [neg_l[8], pos_l[7], pos_l[6]]
     conflict = [c0, c1, c2, c3, c4, c5, c6, c7]
-    # If we implement pure_literal will need to change this
 
-    # n_temps = 4
-    # temp_literals = [Literal(Variable('x1_temp{}'.format(idx)), negated=False) for idx in range(n_temps)]
-    # x1_clauses = [[pos_l[1], l] for l in temp_literals]
-    # temp_literals = [Literal(Variable('x8_temp{}'.format(idx)), negated=False) for idx in range(n_temps)]
-    # x8_clauses = [[pos_l[8], l] for l in temp_literals[:-1]]
-    # temp_literals = [Literal(Variable('x7_temp{}'.format(idx)), negated=False) for idx in range(n_temps)]
-    # x7_clauses = [[neg_l[7], l] for l in temp_literals[:-2]]
-
-    clauses = conflict  # + x1_clauses + x8_clauses + x7_clauses
+    clauses = conflict
     cnf = CnfFormula(clauses)
     cnf = preprocess(cnf)
 

@@ -63,7 +63,7 @@ def backward_transformation(B: Union[EtaMatrix, np.ndarray], Cb: np.ndarray) -> 
 
         y[B_inverted.column_idx] = np.dot(B_inverted.column, Cb)
 
-    # Temporary, until we'll implement LU decomposition
+    #TODO: Temporary, until we'll implement LU decomposition
     else:
         y = np.dot(Cb, np.linalg.inv(B))
 
@@ -76,7 +76,7 @@ def forward_transformation(B: Union[EtaMatrix, np.ndarray], a: np.ndarray) -> np
         d = np.array([a[i] + B_inverted.column[i] * a[B.column_idx] for i in range(len(a))])
         d[B.column_idx] = B_inverted.column[B.column_idx] * a[B.column_idx]
 
-    # Temporary, until we'll implement LU decomposition
+    #TODO: Temporary, until we'll implement LU decomposition
     else:
         d = np.linalg.solve(B, a)
 
@@ -170,21 +170,6 @@ def calculate_entering_bounds(lp, d) -> Tuple[float, int]:
 
 def get_leaving_variable_idx(lp_program, entering_idx: int) -> Tuple[int, float, EtaMatrix]:
     d = FTRAN_using_eta(lp_program, lp_program.An[:, entering_idx])
-
-    # if is_unbounded(d, is_max=not lp_program.is_aux):
-    #     raise UnboundedException()
-
-    # b = lp_program.b
-    # assert any(d != 0)
-    # d_copy = np.copy(d)
-    # d[d == 0] = 1 / np.inf
-    #
-    # # lecture 12 slide 21 (point 4): max t s.t. t * d <= b (i.e. if d <= 0 things get messy)
-    # t = b / d
-    # # d is minus so we negated the equation --> got opposite operation(<=/>=) need to re negate it
-    # t[d < 0] = t[d < 0] * -1
-    # leaving_var = int(np.argmin(t))
-    # # t = b / d
 
     t, leaving_var = calculate_entering_bounds(lp_program, d)
     eta_d = EtaMatrix(d, leaving_var)
