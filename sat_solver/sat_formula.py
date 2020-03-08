@@ -3,7 +3,7 @@ from itertools import count
 from typing import List
 
 from common.operator import Operator
-from sat_solver.patterns import variable_pattern, unary_formula_pattern, binary_formula_pattern
+from sat_solver.patterns import variable_pattern, unary_formula_pattern, binary_formula_pattern, binary_operator_pattern
 
 
 class Literal(object):
@@ -110,77 +110,74 @@ class SatFormula(object):
         formula.__setattr__('value', variable)
         return formula
 
-    @classmethod
-    def from_str(cls, formula: str) -> 'SatFormula':
-        m_variable = re.match(variable_pattern, formula)
-        m_unary = re.match(unary_formula_pattern, formula)
-        m_binary = re.match(binary_formula_pattern, formula)
+    # @classmethod
+    # def from_str(cls, formula: str) -> 'SatFormula':
+    #     m_variable = re.match(variable_pattern, formula)
+    #     m_unary = re.match(unary_formula_pattern, formula)
+    #     m_binary = re.match(binary_formula_pattern, formula)
+    #
+    #     if m_variable:
+    #         variable_name = m_variable.group()
+    #         return SatFormula.create_leaf(variable_name)
+    #
+    #     # Unary case
+    #     if m_unary:
+    #         m = m_unary
+    #         right = None
+    #
+    #     # Binary case
+    #     elif m_binary:
+    #         m = m_binary
+    #         right = SatFormula.from_str(m_binary.group('right'))
+    #
+    #     else:
+    #         raise Exception
+    #
+    #     left = SatFormula.from_str(m.group('left'))
+    #     op = Operator(m.group('op'))
+    #
+    #     return SatFormula(left, right, op)
 
-        if m_variable:
-            variable_name = m_variable.group()
-            return SatFormula.create_leaf(variable_name)
+    @staticmethod
+    def from_str(s):
+        def get_op(s):
+            op = re.search(binary_operator_pattern, s).group(0)
+            return op, len(op)
 
-        # Unary case
-        if m_unary:
-            m = m_unary
-            right = None
+        def get_variable(s, idx):
+            if 'a' <= s[idx] <= 'z':
+                idx += 1
 
-        # Binary case
-        elif m_binary:
-            m = m_binary
-            right = SatFormula.from_str(m_binary.group('right'))
+            while idx < len(s) and s[idx].isdigit():
+                idx += 1
 
-        else:
-            raise Exception
+            return idx
 
-        left = SatFormula.from_str(m.group('left'))
-        op = Operator(m.group('op'))
+        def _from_str_helper(idx):
+            if s[idx] == Operator.NEGATION.value:
+                first, new_idx = _from_str_helper(idx + 1)
+                return SatFormula(first, operator=Operator.NEGATION), new_idx
 
-        return SatFormula(left, right, op)
+            if s[idx] == '(':
+                first, new_idx = _from_str_helper(idx + 1)
+                root, gap_idx = get_op(s[new_idx:])
 
-    # @staticmethod
-    # def from_str(s):
-    #     def get_op(s):
-    #         m_binary_op = re.match(binary_formula_pattern, s)
-    #         if not m_binary_op:
-    #             raise Exception('Cant find operator')
-    #         op = m_binary_op.group(0)
-    #         return op, len(op)
-    #
-    #     def get_variable(s, idx):
-    #         if 'a' <= s[idx] <= 'z':
-    #             idx += 1
-    #
-    #         while idx < len(s) and s[idx].isdigit():
-    #             idx += 1
-    #
-    #         return idx
-    #
-    #     def _from_str_helper(idx):
-    #         if s[idx] == Operator.NEGATION.value:
-    #             first, new_idx = _from_str_helper(idx + 1)
-    #             return SatFormula(first, operator=Operator.NEGATION), new_idx
-    #
-    #         if s[idx] == '(':
-    #             first, new_idx = _from_str_helper(idx + 1)
-    #             root, gap_idx = get_op(s[new_idx:])
-    #
-    #             second, new_idx = _from_str_helper(new_idx + gap_idx)
-    #             return SatFormula(first, second, Operator(root)), new_idx + 1  # The new_idx + 1 is for the ')'
-    #
-    #         if s[idx] in constants:
-    #             return constants[s[idx]], idx + 1
-    #
-    #         var_idx = get_variable(s, idx)
-    #         v = s[idx:var_idx]
-    #         if v not in variables:
-    #             variables[v] = SatFormula.create_leaf(v)
-    #
-    #         return variables[v], var_idx
-    #
-    #     constants = {'T': SatFormula.create_leaf('T'),
-    #                  'F': SatFormula.create_leaf('F', negated=True)}
-    #
-    #     variables = {}
-    #
-    #     return _from_str_helper(0)[0]
+                second, new_idx = _from_str_helper(new_idx + gap_idx)
+                return SatFormula(first, second, Operator(root)), new_idx + 1  # The new_idx + 1 is for the ')'
+
+            if s[idx] in constants:
+                return constants[s[idx]], idx + 1
+
+            var_idx = get_variable(s, idx)
+            v = s[idx:var_idx]
+            if v not in variables:
+                variables[v] = SatFormula.create_leaf(v)
+
+            return variables[v], var_idx
+
+        constants = {'T': SatFormula.create_leaf('T'),
+                     'F': SatFormula.create_leaf('F', negated=True)}
+
+        variables = {}
+
+        return _from_str_helper(0)[0]
