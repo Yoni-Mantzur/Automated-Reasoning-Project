@@ -3,7 +3,6 @@ from timeit import default_timer as timer
 from typing import List
 
 import pytest
-from z3 import Bool, Solver, Or, Not, sat
 
 from sat_solver.DPLL import DPLL
 from sat_solver.cnf_formula import CnfFormula
@@ -32,6 +31,7 @@ def create_random_query(num_variables=5, num_clauses=4, clause_length=3):
 
 
 def get_z3_result(clauses: List[Literal], debug=False) -> bool:
+    from z3 import Bool, Solver, Or, Not, sat
     s = Solver()
     variables = {l.variable: Bool(l.name) for c in clauses for l in c}
 

@@ -1,9 +1,8 @@
 from random import seed, randint, choices, choice, uniform
 from timeit import default_timer as timer
-from typing import List
+from typing import List, Any
 
 import pytest
-from z3 import Not, Or, And, sat, Solver, Real, Function, RealSort, ArithRef
 
 from smt_solver.formula import Formula
 
@@ -12,12 +11,13 @@ seed(0)
 
 class UF:
     def __init__(self, name: str, max_num_vars: int):
+        from z3 import Not, Or, And, sat, Solver, Real, Function, RealSort, ArithRef
         self.name = name
         self.input_range = randint(1, min(max_num_vars, 5))
         z3_input = [RealSort()] * self.input_range
         self.z3 = Function(name, *z3_input, RealSort())
 
-    def create_random_call(self, smt_vars: List['smt_var']) -> [str, ArithRef]:
+    def create_random_call(self, smt_vars: List['smt_var']) -> [str, Any]:
         v = choices(smt_vars, k=self.input_range)
         v_str = "".join(str(v)).replace('[', '').replace(']', '')
         z3_func_call = self.z3(*[cur_v.z3 for cur_v in v])
@@ -130,6 +130,7 @@ random_smt = [[10, 20, 50], [20, 40, 100], [31, 40, 100], [20, 40, 120], [50, 50
 @pytest.mark.z3
 @pytest.mark.parametrize(['num_functions', 'num_variables', 'num_clauses'], random_smt)
 def test_random_smt(num_functions, num_variables, num_clauses):
+    from z3 import Not, Or, And, sat, Solver, Real, Function, RealSort, ArithRef
     str_query, z3_query = create_random_query(num_functions=num_functions, num_variables=num_variables,
                                               num_clauses=num_clauses)
     perform_test(str_query, z3_query)
