@@ -9,6 +9,10 @@ from sat_solver.cnf_formula import CnfFormula
 from sat_solver.preprocessor import preprocess
 from sat_solver.sat_formula import Variable, Literal
 
+try:
+    from z3 import Bool, Solver, Or, Not, sat
+except ImportError:
+    pass
 
 def create_random_query(num_variables=5, num_clauses=4, clause_length=3):
     assert clause_length <= num_variables
@@ -31,7 +35,6 @@ def create_random_query(num_variables=5, num_clauses=4, clause_length=3):
 
 
 def get_z3_result(clauses: List[Literal], debug=False) -> bool:
-    from z3 import Bool, Solver, Or, Not, sat
     s = Solver()
     variables = {l.variable: Bool(l.name) for c in clauses for l in c}
 

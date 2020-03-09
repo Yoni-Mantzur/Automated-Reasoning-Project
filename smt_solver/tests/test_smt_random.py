@@ -6,12 +6,17 @@ import pytest
 
 from smt_solver.formula import Formula
 
+try:
+    from z3 import Not, Or, And, sat, Solver, Real, Function, RealSort, ArithRef
+except ImportError:
+    pass
+
 seed(0)
 
 
 class UF:
     def __init__(self, name: str, max_num_vars: int):
-        from z3 import Not, Or, And, sat, Solver, Real, Function, RealSort, ArithRef
+
         self.name = name
         self.input_range = randint(1, min(max_num_vars, 5))
         z3_input = [RealSort()] * self.input_range

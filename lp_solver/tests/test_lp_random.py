@@ -7,6 +7,10 @@ import pytest
 
 from lp_solver.unbounded_exception import InfeasibleException
 from lp_solver.lp_program import LpProgram
+try:
+    from gurobipy import GRB, Model, LinExpr
+except ImportError:
+    pass
 
 seed(0)
 
@@ -64,7 +68,6 @@ def test_random_lp(num_variables, num_equations):
 
 def run_one_compare(num_variables, num_equations, constraint_coefficent_sample=constraint_coefficent_sample,
                     obj_coefficent_sample=obj_coefficent_sample, constraint_scalar_sample=constraint_scalar_sample):
-    from gurobipy import GRB, Model, LinExpr
     seed(0)
     gmodel = Model("test")
     variables = [lp_variable(i, gmodel) for i in range(1, num_variables + 1)]
