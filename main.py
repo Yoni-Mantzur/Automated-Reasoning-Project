@@ -19,14 +19,17 @@ if __name__ == "__main__":
 
     q = sys.argv[2]
     if sys.argv[1].lower() == 'sat':
-        formula = preprocess_from_sat(SatFormula.from_str(q))
+        sat = SatFormula.from_str(q)
+        formula = preprocess_from_sat(sat)
         dpll = DPLL(formula)
         res = dpll.search()
         print(f"Got {'SAT' if res else 'UNSAT'} for query\n{q}")
         # optional to retrieve the assignment
         if res:
             assignment = dpll.get_full_assignment()
-            pprint(assignment)
+            all_variables = set(l.variable for l in sat.get_literals())
+            actual_assignments = map(lambda k: (k, assignment[k]), all_variables)
+            pprint(dict(actual_assignments))
     if sys.argv[1].lower() == 'smt':
         smt_query = Formula.from_str(q)
         res, model = smt_query.solve()
@@ -53,4 +56,4 @@ if __name__ == "__main__":
         elif z == np.inf:
             printable_z = 'Unbounded'
 
-        print(f"Got {printable_z} for objective\n\t{objective}")
+        print(f"Got {printable_z} for objective\n\t{objective.replace(',', '+')}")

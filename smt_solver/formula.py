@@ -249,7 +249,6 @@ class Formula(object):
         formula = Formula()
         formula.sat_formula = from_str_helper(raw_formula)[0]
         formula.set_literals()
-        print(formula)
         return formula
 
     def update_equations(self, equation: EquationTerm) -> EquationTerm:
