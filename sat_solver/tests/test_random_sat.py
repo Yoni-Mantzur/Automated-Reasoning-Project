@@ -76,7 +76,7 @@ def perform_test(clauses: List[List[Literal]], debug=False):
 random_sat = [[50, 20, 10], [100, 40, 39], [100, 50, 40], [120, 50, 21], [150, 51, 50]] \
              + choices([[f, v, c] for f in range(2, 10) for c in range(2, f) for v in range(2, 10)], k=100)
 
-
+@pytest.mark.z3
 @pytest.mark.parametrize(['num_variables', 'num_clauses', 'clause_length'], random_sat)
 def test_random_sat(num_variables, num_clauses, clause_length):
     clauses = create_random_query(num_variables, num_clauses, clause_length)

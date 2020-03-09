@@ -1,4 +1,4 @@
-.PHONY: sat smt lp test
+.PHONY: sat smt lp test test-all
 
 all:  sat smt lp
 
@@ -10,4 +10,7 @@ lp:
 	python3 main.py lp 'x1,x2<=3' 'x1<=3' 'x1,x2'
 
 test:
+	pytest-3 -m "not (gurobi or z3)"
+
+test-all:
 	pytest-3

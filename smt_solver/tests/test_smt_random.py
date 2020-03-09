@@ -127,7 +127,7 @@ def perform_test(str_query, z3_query, debug=False):
 random_smt = [[10, 20, 50], [20, 40, 100], [31, 40, 100], [20, 40, 120], [50, 50, 150]] \
              + choices([[f, v, c] for c in range(2, 30) for f in range(2, 10) for v in range(2, 10)], k=100)
 
-
+@pytest.mark.z3
 @pytest.mark.parametrize(['num_functions', 'num_variables', 'num_clauses'], random_smt)
 def test_random_smt(num_functions, num_variables, num_clauses):
     str_query, z3_query = create_random_query(num_functions=num_functions, num_variables=num_variables,

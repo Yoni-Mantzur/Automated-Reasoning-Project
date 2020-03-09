@@ -26,3 +26,5 @@ LP:
 Tests are based on pytest (run pytest in main folder to execute all of them)  
 Each model has its own tests, most of them are unit tests and one special file which is called test_random_MODEL
 The random tests samples different parameters (number of variables, number of equations etc...), and runs ensures the result of our model and z3 (sat & smt) or Gurobi (LP) are the same
+
+The random tests require gurobipy and z3py

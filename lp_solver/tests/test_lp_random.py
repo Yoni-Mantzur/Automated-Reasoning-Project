@@ -47,6 +47,7 @@ lp_random_tests_aux = [
 ]
 
 
+@pytest.mark.gurobi
 @pytest.mark.timeout(55)
 @pytest.mark.parametrize(['num_variables', 'num_equations'], lp_random_tests_aux)
 def test_random_lp_auxiliary(num_variables, num_equations):
@@ -55,7 +56,7 @@ def test_random_lp_auxiliary(num_variables, num_equations):
 
 lp_random_tests = [[3, 2], [20, 2], [5, 4], [7, 4], [4, 2], [4, 4], [5, 3], [50, 30]]
 
-
+@pytest.mark.gurobi
 @pytest.mark.timeout(55)
 @pytest.mark.parametrize(['num_variables', 'num_equations'], lp_random_tests)
 def test_random_lp(num_variables, num_equations):
