@@ -20,8 +20,12 @@ SMT:
 LP: 
 
     python3 main.py lp '0x0,2x1,3x2,x3<=5' '4x1,x2,2x3<=11' '3x1,4x2,2x3<=8' '5x1,4x2,3x3'  
-    
 
+LP Theory
+    python3 main.py lp '((0x0,2x1,3x2,x3<=5&4x1,x2,2x3<=11)&3x1,4x2,2x3<=8)' '5x1,4x2,3x3'
+
+We invoke the LP Theory solver if there is only one equation, if there is a list we invoke the regular LP (which also returns the objective)
+ 
 ## Tests 
 Tests are based on pytest (run pytest in main folder to execute all of them)  
 Each model has its own tests, most of them are unit tests and one special file which is called test_random_MODEL

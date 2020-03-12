@@ -22,11 +22,12 @@ class Equation(object):
     TYPES = tuple(t.value for t in Type)
 
     def __init__(self, units: Dict[int, float] = None, type_equation: Type = Type.LE,
-                 scalar: float = None):
+                 scalar: float = None, negated: bool = False):
         self.units = units or {}
         self.type = type_equation
         self.max_variable_index = -1
         self.scalar = scalar
+        self.negated = negated
 
     @staticmethod
     def unit_from_str(unit: str) -> Tuple[int, float]:
@@ -76,8 +77,8 @@ class Equation(object):
         return new_equation
 
     @staticmethod
-    def get_equation(equation_str: str) -> 'Equation':
-        eq = Equation()
+    def get_equation(equation_str: str, negated: bool= False) -> 'Equation':
+        eq = Equation(negated=negated)
         eq.from_str(equation_str)
         return eq
 

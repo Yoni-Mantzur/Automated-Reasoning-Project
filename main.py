@@ -2,6 +2,8 @@ from pprint import pprint
 
 import numpy as np
 import sys
+
+from common.operator import Operator
 from sat_solver.DPLL import DPLL
 from sat_solver.preprocessor import preprocess_from_sat
 from smt_solver.formula import Formula
@@ -42,18 +44,21 @@ if __name__ == "__main__":
         equations = sys.argv[2:-1]
         objective = sys.argv[-1]
         try:
-            z = LpProgram(equations, objective).solve()
-            # To use the LP that uses the sat solver uncomment:
-            # res, z = LpTheory(equations, objective).solve()
-            printable_z = z
+            if len(equations) == 1:
+                equations = equations[0]
+                res = LpTheory(equations, objective).solve()
+                if res:
+                    printable_z = 'feasible'
+                else:
+                    printable_z = 'Infeasible'
+            else:
+                z = LpProgram(equations, objective).solve()
+                printable_z = z
         except UnboundedException:
             z = np.inf
+            printable_z = 'Unbounded'
         except InfeasibleException:
             z = None
-
-        if z is None:
             printable_z = 'Infeasible'
-        elif z == np.inf:
-            printable_z = 'Unbounded'
 
         print(f"Got {printable_z} for objective\n\t{objective.replace(',', '+')}")
